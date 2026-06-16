@@ -239,7 +239,7 @@ textarea.in:focus,input.in:focus{outline:none;border-color:var(--purple);backgro
 .tab.on{background:var(--purple);color:#fff}
 
 /* ---------- Modal / lightbox ---------- */
-.modal-bg{position:fixed;inset:0;background:rgba(42,36,64,.6);backdrop-filter:blur(4px);z-index:100;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-bg{position:fixed;inset:0;background:rgba(42,36,64,.6);backdrop-filter:blur(4px);z-index:140;display:none;align-items:center;justify-content:center;padding:20px}
 .modal-bg.show{display:flex}
 .modal{background:#fff;border-radius:22px;max-width:560px;width:100%;max-height:90vh;overflow:auto;box-shadow:var(--shadow-lg)}
 .modal-head{padding:20px 24px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;position:sticky;top:0;background:#fff;z-index:2}
@@ -1108,6 +1108,7 @@ function openMedia(i){
 window.openMedia=openMedia;
 function showWSFromImage(){
   const ws=CUR.ws, work=CUR.work;
+  closeLB();   // 라이트박스를 먼저 닫아 모달이 가려지지 않게
   openModal(`${ws.emoji} ${ws.title} — ${ws.theme}`, answersSummary(ws, work)
     + `<div style="margin-top:16px;text-align:right"><button class="btn" onclick="closeModal()">닫기</button></div>`);
 }
