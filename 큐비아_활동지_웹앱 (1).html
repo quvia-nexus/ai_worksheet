@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>큐비아 AI 미래인재 프로젝트 · 활동지</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<!-- Firebase (compat SDK: 별도 빌드 없이 바로 사용) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<style>
+:root{
+  --purple:#6C4FD6; --purple-dk:#4A2FA8; --purple-lt:#EDE9FB; --lav:#F6F3FD;
+  --gold:#F2B705; --teal:#1FB6A6; --ink:#2A2440; --gray:#6E6A85;
+  --line:#D9D2F0; --white:#FFFFFF; --bg:#F3F0FB;
+  --shadow:0 6px 22px rgba(74,47,168,.10); --shadow-lg:0 14px 44px rgba(74,47,168,.18);
+  --r:18px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:'Noto Sans KR',sans-serif; color:var(--ink);
+  background:
+    radial-gradient(1200px 600px at 110% -10%, rgba(108,79,214,.14), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(242,183,5,.10), transparent 55%),
+    var(--bg);
+  min-height:100vh; line-height:1.55;
+}
+.jua{font-family:'Jua',sans-serif}
+.dodum{font-family:'Gowun Dodum',sans-serif}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+input,textarea,select{font-family:inherit}
+img{max-width:100%;display:block}
+
+/* ---------- App shell ---------- */
+.app{max-width:1080px;margin:0 auto;padding:0 16px 80px}
+.topbar{
+  position:sticky;top:0;z-index:30;
+  background:rgba(243,240,251,.82);backdrop-filter:blur(12px);
+  display:flex;align-items:center;gap:14px;
+  padding:14px 16px;margin:0 -16px 18px;border-bottom:1px solid var(--line);
+}
+.logo{display:flex;align-items:center;gap:10px;font-weight:900}
+.logo .mark{
+  width:38px;height:38px;border-radius:50%;flex:none;
+  background:radial-gradient(circle at 35% 30%, #8e74e8, var(--purple) 60%, var(--purple-dk));
+  position:relative;box-shadow:0 4px 12px rgba(74,47,168,.4)
+}
+.logo .mark::after{content:"";position:absolute;right:-3px;bottom:-3px;width:14px;height:14px;border-radius:50%;border:3px solid var(--white);background:var(--gold)}
+.logo b{font-size:18px;letter-spacing:.5px;color:var(--purple-dk)}
+.logo span{display:block;font-size:11px;color:var(--gray);font-weight:700;letter-spacing:1px}
+.spacer{flex:1}
+.who{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:700;color:var(--purple-dk)}
+.cloudpill{font-size:12px;font-weight:800;padding:6px 11px;border-radius:99px;white-space:nowrap}
+.cloudpill.on{background:#dff5ee;color:#0d8a6f}
+.cloudpill.off{background:#fdf3d9;color:#a07c00;cursor:pointer}
+.cloudpill.off:hover{background:#fbe9bd}
+.who .avatar{width:32px;height:32px;border-radius:50%;background:var(--purple);color:#fff;display:grid;place-items:center;font-size:14px;font-weight:900}
+.btn{
+  background:var(--purple);color:#fff;font-weight:700;font-size:14px;
+  padding:10px 16px;border-radius:12px;transition:.15s;white-space:nowrap;
+  box-shadow:0 4px 12px rgba(108,79,214,.3)
+}
+.btn:hover{transform:translateY(-1px);box-shadow:0 7px 18px rgba(108,79,214,.4)}
+.btn:active{transform:translateY(0)}
+.btn.ghost{background:#fff;color:var(--purple-dk);border:1.5px solid var(--line);box-shadow:none}
+.btn.ghost:hover{border-color:var(--purple);background:var(--lav)}
+.btn.gold{background:var(--gold);color:#3a2d00;box-shadow:0 4px 12px rgba(242,183,5,.35)}
+.btn.teal{background:var(--teal);box-shadow:0 4px 12px rgba(31,182,166,.3)}
+.btn.sm{padding:7px 12px;font-size:13px;border-radius:10px}
+.btn.lg{padding:15px 26px;font-size:16px;border-radius:14px}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
+
+/* ---------- Login ---------- */
+.login-wrap{min-height:100vh;display:grid;place-items:center;padding:24px}
+.login-card{
+  width:min(440px,100%);background:#fff;border-radius:26px;overflow:hidden;
+  box-shadow:var(--shadow-lg)
+}
+.login-hero{
+  background:linear-gradient(135deg,var(--purple),var(--purple-dk));
+  color:#fff;padding:34px 30px 30px;position:relative;overflow:hidden
+}
+.login-hero::before{content:"";position:absolute;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.10);top:-70px;right:-50px}
+.login-hero::after{content:"";position:absolute;width:120px;height:120px;border-radius:50%;background:rgba(242,183,5,.25);bottom:-50px;right:30px}
+.login-hero .eyebrow{font-size:12px;font-weight:700;letter-spacing:2px;color:#cfc3ff;margin-bottom:8px}
+.login-hero h1{font-size:27px;font-weight:900;line-height:1.25;position:relative}
+.login-hero .tag{margin-top:8px;color:var(--gold);font-weight:700;font-size:15px;position:relative}
+.login-body{padding:28px 30px 32px}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:13px;font-weight:700;color:var(--purple-dk);margin-bottom:7px}
+.field input,.field select{
+  width:100%;padding:13px 15px;border:1.5px solid var(--line);border-radius:13px;
+  font-size:16px;color:var(--ink);transition:.15s;background:var(--lav)
+}
+.field input:focus,.field select:focus{outline:none;border-color:var(--purple);background:#fff;box-shadow:0 0 0 4px rgba(108,79,214,.12)}
+.field .hint{font-size:12px;color:var(--gray);margin-top:6px}
+.seg{display:flex;gap:8px;background:var(--lav);padding:5px;border-radius:14px}
+.seg button{flex:1;padding:11px;border-radius:10px;font-weight:700;font-size:14px;color:var(--gray);transition:.15s}
+.seg button.on{background:#fff;color:var(--purple-dk);box-shadow:var(--shadow)}
+.login-err{background:#fde8e8;color:#c0392b;font-size:13px;font-weight:600;padding:10px 14px;border-radius:11px;margin-bottom:14px;display:none}
+.login-err.show{display:block}
+
+/* ---------- Home / dashboard ---------- */
+.page-head{margin:6px 0 22px}
+.page-head .eyebrow{font-size:12px;font-weight:800;letter-spacing:2px;color:var(--purple);margin-bottom:6px}
+.page-head h2{font-size:30px;font-weight:900;color:var(--ink);line-height:1.2}
+.page-head p{color:var(--gray);margin-top:8px;font-size:15px}
+
+.grid{display:grid;gap:18px}
+.cards{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+
+.wcard{
+  background:#fff;border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow);
+  transition:.18s;border:1.5px solid transparent;text-align:left;display:flex;flex-direction:column
+}
+.wcard:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg);border-color:var(--purple-lt)}
+.wcard .top{padding:20px 20px 16px;color:#fff;position:relative;overflow:hidden}
+.wcard .top.moon{background:linear-gradient(135deg,#7659d6,#4A2FA8)}
+.wcard .top.city{background:linear-gradient(135deg,#5b8def,#3a5fc4)}
+.wcard .top.video{background:linear-gradient(135deg,#28b6a6,#1a7d8c)}
+.wcard .top .emoji{font-size:30px;margin-bottom:8px}
+.wcard .top .lvl{font-size:11px;font-weight:800;letter-spacing:1px;opacity:.9}
+.wcard .top h3{font-size:19px;font-weight:900;margin-top:2px}
+.wcard .top .sub{font-size:13px;opacity:.92;margin-top:3px}
+.wcard .body{padding:16px 20px 20px;flex:1;display:flex;flex-direction:column;gap:12px}
+.wcard .meta{font-size:13px;color:var(--gray)}
+.wcard .prog{height:8px;border-radius:99px;background:var(--lav);overflow:hidden}
+.wcard .prog i{display:block;height:100%;background:linear-gradient(90deg,var(--purple),var(--teal));border-radius:99px;transition:width .4s}
+.wcard .row{display:flex;gap:8px;margin-top:auto}
+.wcard .row .btn{flex:1;text-align:center}
+.badge{display:inline-block;font-size:11px;font-weight:800;padding:3px 9px;border-radius:99px;background:var(--purple-lt);color:var(--purple-dk)}
+.badge.done{background:#dff5ee;color:#0d8a6f}
+
+/* ---------- Worksheet ---------- */
+.ws-head{
+  background:linear-gradient(135deg,var(--purple-dk),var(--purple));
+  color:#fff;border-radius:var(--r);padding:22px 24px;margin-bottom:18px;
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:var(--shadow)
+}
+.ws-head .emoji{font-size:34px}
+.ws-head .eyebrow{font-size:11px;font-weight:800;letter-spacing:2px;color:#cfc3ff}
+.ws-head h2{font-size:22px;font-weight:900}
+.ws-head .sub{font-size:13px;color:var(--gold);font-weight:700;margin-top:2px}
+
+.step{background:#fff;border-radius:var(--r);box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden}
+.step-band{background:var(--purple);color:#fff;padding:13px 20px;display:flex;align-items:center;gap:10px;font-weight:900}
+.step-band .n{font-size:13px;color:var(--gold);font-weight:900;letter-spacing:1px}
+.step-band .t{font-size:16px}
+.step-body{padding:18px 20px 20px}
+.step-hint{font-size:13px;color:var(--gray);font-style:italic;margin-bottom:14px}
+.lab{font-size:14px;font-weight:700;color:var(--purple-dk);margin:14px 0 7px}
+.lab:first-child{margin-top:0}
+textarea.in{
+  width:100%;border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;
+  font-size:15px;resize:vertical;min-height:54px;background:var(--lav);transition:.15s;line-height:1.6
+}
+input.in{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;font-size:15px;background:var(--lav);transition:.15s}
+textarea.in:focus,input.in:focus{outline:none;border-color:var(--purple);background:#fff;box-shadow:0 0 0 4px rgba(108,79,214,.10)}
+.formula{background:var(--lav);border:1.5px dashed var(--purple);border-radius:12px;padding:12px 14px;font-size:14px;color:var(--ink);margin-bottom:12px}
+.formula b{color:var(--purple);font-weight:800}
+
+.checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.chk{display:flex;align-items:center;gap:9px;padding:11px 13px;border:1.5px solid var(--line);border-radius:12px;background:#fff;cursor:pointer;transition:.13s;font-size:14px;font-weight:600;color:var(--ink)}
+.chk:hover{border-color:var(--purple);background:var(--lav)}
+.chk.on{border-color:var(--purple);background:var(--purple-lt);color:var(--purple-dk)}
+.chk .box{width:20px;height:20px;border-radius:6px;border:2px solid var(--purple);flex:none;display:grid;place-items:center;font-size:13px;color:#fff;transition:.13s}
+.chk.on .box{background:var(--purple)}
+.chk.radio .box{border-radius:50%}
+
+/* matrix table */
+.matrix{width:100%;border-collapse:separate;border-spacing:0;font-size:14px;border:1.5px solid var(--line);border-radius:12px;overflow:hidden}
+.matrix th{background:var(--purple-dk);color:#fff;padding:10px 12px;text-align:left;font-size:13px;font-weight:700}
+.matrix td{padding:8px 10px;border-top:1px solid var(--line);vertical-align:top}
+.matrix td.el{background:var(--purple-lt);color:var(--purple-dk);font-weight:700;white-space:nowrap;width:30%}
+.matrix td.eg{color:var(--gray);font-size:12.5px;width:28%}
+.matrix textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px;font-size:14px;background:#fff;resize:vertical;min-height:46px}
+.matrix-scroll{overflow-x:auto}
+
+/* storyboard cut cards */
+.cut{border:1.5px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px;background:var(--lav)}
+.cut-h{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.cut-h .t{font-weight:900;color:var(--purple-dk);font-size:14px}
+.cut-h .time{font-size:12px;font-weight:700;color:#fff;background:var(--purple);padding:3px 10px;border-radius:99px}
+.cut .mini{font-size:12px;font-weight:700;color:var(--purple-dk);margin:8px 0 5px}
+.cut textarea{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:9px 11px;font-size:14px;background:#fff;resize:vertical;min-height:42px}
+
+/* media (image/video) capture */
+.media-zone{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.media-add{
+  border:2px dashed var(--purple);border-radius:14px;background:var(--lav);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+  padding:22px 12px;color:var(--purple-dk);font-weight:700;font-size:13px;text-align:center;min-height:130px;transition:.13s
+}
+.media-add:hover{background:var(--purple-lt)}
+.media-add .ic{font-size:28px}
+.media-item{position:relative;border-radius:14px;overflow:hidden;box-shadow:var(--shadow);background:#000;aspect-ratio:1;cursor:pointer}
+.media-item img,.media-item video{width:100%;height:100%;object-fit:cover}
+.media-item .tagline{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(transparent,rgba(0,0,0,.75));color:#fff;font-size:11px;font-weight:700;padding:18px 9px 7px}
+.media-item .vbadge{position:absolute;top:8px;left:8px;background:var(--teal);color:#fff;font-size:11px;font-weight:800;padding:3px 8px;border-radius:99px}
+.media-item .del{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;display:grid;place-items:center;font-size:14px;opacity:0;transition:.13s}
+.media-item:hover .del{opacity:1}
+.media-item .play{position:absolute;inset:0;display:grid;place-items:center;font-size:34px;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.5);pointer-events:none}
+
+/* paper-capture (저학년 손글씨 사진) */
+.paper-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.paper-shot{position:relative;border-radius:14px;overflow:hidden;box-shadow:var(--shadow);cursor:pointer;background:#fff;border:1.5px solid var(--line)}
+.paper-shot img{width:100%;aspect-ratio:3/4;object-fit:cover}
+.paper-shot .pg{position:absolute;top:8px;left:8px;background:var(--purple);color:#fff;font-size:11px;font-weight:800;padding:3px 9px;border-radius:99px}
+.paper-shot .del{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;display:grid;place-items:center;font-size:14px}
+
+.savebar{
+  position:sticky;bottom:0;z-index:20;margin:18px -16px 0;padding:14px 16px;
+  background:rgba(255,255,255,.92);backdrop-filter:blur(12px);border-top:1px solid var(--line);
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap
+}
+.savebar .status{font-size:13px;color:var(--gray);font-weight:600}
+.savebar .status b{color:var(--teal)}
+.savebar .spacer{flex:1}
+
+/* ---------- Teacher ---------- */
+.tcard{background:#fff;border-radius:var(--r);box-shadow:var(--shadow);padding:22px 24px;margin-bottom:16px}
+.tcard h3{font-size:18px;font-weight:900;color:var(--purple-dk);margin-bottom:6px;display:flex;align-items:center;gap:9px}
+.tcard h3 .pin{font-size:20px}
+.tcard p{font-size:14.5px;color:var(--ink);margin-bottom:8px}
+.tcard ul{margin:6px 0 8px 4px;list-style:none}
+.tcard ul li{position:relative;padding-left:20px;margin-bottom:6px;font-size:14.5px}
+.tcard ul li::before{content:"•";position:absolute;left:4px;color:var(--purple);font-weight:900}
+.example{background:var(--lav);border-left:4px solid var(--gold);border-radius:0 12px 12px 0;padding:13px 16px;margin:10px 0;font-size:14px}
+.example .q{font-weight:700;color:var(--purple-dk);margin-bottom:4px}
+.example .a{color:var(--ink);font-style:italic}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.tab{padding:10px 16px;border-radius:12px;font-weight:700;font-size:14px;background:#fff;color:var(--gray);box-shadow:var(--shadow);transition:.13s}
+.tab.on{background:var(--purple);color:#fff}
+
+/* ---------- Modal / lightbox ---------- */
+.modal-bg{position:fixed;inset:0;background:rgba(42,36,64,.6);backdrop-filter:blur(4px);z-index:100;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-bg.show{display:flex}
+.modal{background:#fff;border-radius:22px;max-width:560px;width:100%;max-height:90vh;overflow:auto;box-shadow:var(--shadow-lg)}
+.modal-head{padding:20px 24px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;position:sticky;top:0;background:#fff;z-index:2}
+.modal-head h3{font-size:18px;font-weight:900;color:var(--purple-dk)}
+.modal-body{padding:20px 24px 24px}
+.modal .close{margin-left:auto;width:34px;height:34px;border-radius:50%;background:var(--lav);color:var(--purple-dk);font-size:18px;display:grid;place-items:center}
+
+.lightbox{position:fixed;inset:0;background:rgba(10,6,24,.92);z-index:120;display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+.lightbox.show{display:flex}
+.lightbox img,.lightbox video{max-width:92vw;max-height:74vh;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.lightbox .cap{color:#fff;margin-top:16px;font-weight:700;text-align:center;max-width:600px}
+.lightbox .lb-actions{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;justify-content:center}
+.lightbox .lb-close{position:absolute;top:18px;right:22px;color:#fff;font-size:30px;width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.12);display:grid;place-items:center}
+
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:13px 22px;border-radius:14px;font-weight:700;font-size:14px;z-index:200;opacity:0;pointer-events:none;transition:.3s;box-shadow:var(--shadow-lg)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+.empty{text-align:center;padding:50px 20px;color:var(--gray)}
+.empty .ic{font-size:46px;margin-bottom:12px}
+.hide{display:none!important}
+
+@media(max-width:640px){
+  .page-head h2{font-size:24px}
+  .ws-head{padding:18px}
+  .topbar{gap:8px}
+  .who .nm{display:none}
+  .btn{padding:9px 13px;font-size:13px}
+}
+@media print{
+  .topbar,.savebar,.no-print{display:none!important}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- mounts: login / app / modals injected by JS -->
+<div class="modal-bg" id="modalBg"><div class="modal" id="modalEl"></div></div>
+<div class="lightbox" id="lightbox"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+//  QUVIA-LAB · AI 미래인재 프로젝트 활동지 웹앱
+//  단일 HTML · localStorage 저장 (Firebase 연동 쉽게 분리 설계)
+// ============================================================
+
+/* ---------------- 활동지 정의 (업로드한 docx 기반) ---------------- */
+const WORKSHEETS = {
+  poster_low: {
+    id:"poster_low", kind:"poster", grade:"초등 1~3학년",
+    title:"AI 포스터 만들기", theme:"달 탐사 프로젝트",
+    emoji:"🌙", cls:"moon", lvl:"LV.1 EXPLORER",
+    tools:"ChatGPT / Gemini", handMode:true,  // 저학년: 손글씨 사진 모드 지원
+    intro:"큐비와 함께 달을 탐험하며 나만의 포스터를 만들어요.",
+    steps:[
+      {id:"s1", n:"STEP 1", t:"내가 만들 그림 상상하기",
+       hint:"머릿속에 떠오르는 장면을 단어나 그림으로 자유롭게 적어보세요.",
+       fields:[{type:"textarea", id:"imagine", label:"떠오르는 장면 적기", rows:3}]},
+      {id:"s2", n:"STEP 2", t:"단어로 나누어 보기",
+       hint:"AI에게 잘 부탁하려면 네 가지를 또렷하게 정해요.",
+       fields:[
+         {type:"textarea", id:"who", label:"① 누가 / 무엇이 나오나요?", ph:"예: 우주복을 입은 귀여운 큐비"},
+         {type:"textarea", id:"where", label:"② 어디에 있나요?", ph:"예: 별이 반짝이는 달 위"},
+         {type:"textarea", id:"what", label:"③ 무엇을 하고 있나요?", ph:"예: 깃발을 꽂고 서 있다"},
+         {type:"checks", id:"style", label:"④ 어떤 그림 느낌으로 만들까요?", multi:false,
+          options:["귀여운 일러스트","3D 애니메이션","디즈니 느낌","진짜 같은 사진","만화 스타일","수채화"]}
+       ]},
+      {id:"s3", n:"STEP 3", t:"한 문장으로 이어 붙이기",
+       formula:"[어디]에서 [누가]가 [무엇]을 하는 [그림 느낌] 그림을 그려줘.",
+       fields:[{type:"textarea", id:"sentence", label:"내가 만든 문장", rows:3}]},
+      {id:"s4", n:"STEP 4", t:"AI 그림 보고 생각하기",
+       fields:[
+         {type:"checks", id:"satisfied", label:"내가 원한 대로 잘 나왔나요?", multi:false,
+          options:["응! 마음에 들어요","조금 다르게 고치고 싶어요"]},
+         {type:"textarea", id:"fix", label:"고치고 싶은 점이 있다면 무엇인가요?"}
+       ]},
+      {id:"s5", n:"STEP 5", t:"내 포스터 자랑하기",
+       fields:[
+         {type:"textarea", id:"best", label:"내 포스터에서 가장 마음에 드는 부분은?"},
+         {type:"textarea", id:"more", label:"AI에게 또 부탁한다면 무엇을 더 넣고 싶나요?"}
+       ]}
+    ]
+  },
+
+  poster_high: {
+    id:"poster_high", kind:"poster", grade:"초등 4~6학년",
+    title:"AI 포스터 만들기", theme:"2050년 미래도시",
+    emoji:"🏙️", cls:"city", lvl:"LV.3 DESIGNER",
+    tools:"ChatGPT / Gemini", handMode:false,
+    intro:"2050년 내가 꿈꾸는 도시를 설계해 포스터로 표현해요.",
+    steps:[
+      {id:"s1", n:"STEP 1", t:"포스터 기획하기",
+       fields:[
+         {type:"input", id:"title", label:"포스터 제목"},
+         {type:"textarea", id:"message", label:"전달하고 싶은 핵심 메시지",
+          hint:'예 — "달에 기지를 건설하자" / "미래도시는 자연과 함께" / "안전한 디지털 세상"', rows:2}
+       ]},
+      {id:"s2", n:"STEP 2", t:"구성 스케치 & 요소 정하기",
+       fields:[
+         {type:"checks", id:"elements", label:"등장할 요소 체크 (여러 개 가능)", multi:true,
+          options:["우주인 / 캐릭터","로켓 / 비행체","건물 / 도시","자연 / 나무","지구 / 행성","기타"]}
+       ]},
+      {id:"s3", n:"STEP 3", t:"프롬프트 4요소 채우기",
+       hint:"AI가 잘 알아듣는 프롬프트는 4가지 요소로 이루어져요. 칸을 구체적으로 채워보세요.",
+       fields:[{type:"matrix", id:"matrix", rows:[
+         {el:"주인공 / 핵심 대상", eg:"예: 우주복 입은 큐비, 하늘을 나는 택시"},
+         {el:"배경 / 장소", eg:"예: 분화구가 있는 달 표면, 빌딩 숲"},
+         {el:"색감 / 분위기", eg:"예: 신비로운 보라빛 우주, 따뜻한 낮"},
+         {el:"그림 스타일", eg:"예: 3D 애니메이션, 사실적인 8K 렌더링"}
+       ]}]},
+      {id:"s4", n:"STEP 4", t:"프롬프트 문장 완성 & 영어로 다듬기",
+       formula:"[배경]에서 [주인공]이 [행동]을 하는, [색감·분위기]의 [그림 스타일] 포스터를 만들어줘.",
+       fields:[
+         {type:"textarea", id:"ko", label:"① 내가 쓴 한글 프롬프트", rows:2},
+         {type:"textarea", id:"en", label:"② 영어로 바꾼 프롬프트", hint:"파파고·DeepL로 번역해 보세요.", rows:2}
+       ]},
+      {id:"s5", n:"STEP 5", t:"결과 분석하기",
+       fields:[
+         {type:"checks", id:"intended", label:"내가 의도한 것이 잘 나왔나요?", multi:false, options:["예","아니오"]},
+         {type:"checks", id:"lacking", label:"부족했던 점 체크", multi:true,
+          options:["인물이 이상함","배경이 다름","색깔이 다름","분위기가 다름","물건이 빠짐","기타"]}
+       ]},
+      {id:"s6", n:"STEP 6", t:"프롬프트 개선하기",
+       fields:[{type:"textarea", id:"improve", label:"추가하거나 수정할 내용", rows:3}]},
+      {id:"s7", n:"STEP 7", t:"AI 창작자 인터뷰",
+       fields:[
+         {type:"textarea", id:"itv1", label:"가장 중요하게 생각한 장면은 무엇인가요?", rows:2},
+         {type:"textarea", id:"itv2", label:"프롬프트를 수정하면서 무엇이 달라졌나요?", rows:2}
+       ]}
+    ]
+  },
+
+  video: {
+    id:"video", kind:"video", grade:"초6~중등 (마스터과정)",
+    title:"AI 공익영상 만들기", theme:"안전한 디지털 세상 · 30초~1분",
+    emoji:"🎬", cls:"video", lvl:"LV.5 MASTER",
+    tools:"Google Vids 등", handMode:false,
+    intro:"8초 클립을 4~6개 이어 붙여 30초~1분 공익영상을 완성해요.",
+    steps:[
+      {id:"s1", n:"STEP 1", t:"공익 메시지 정하기",
+       hint:"'안전한 디지털 세상'을 주제로 전하고 싶은 한 가지 메시지를 정해요.",
+       fields:[
+         {type:"checks", id:"topic", label:"우리 모둠이 다룰 주제", multi:false,
+          options:["사이버 폭력 예방","개인정보 보호","악성 댓글 멈추기","가짜뉴스 가려내기","AI 윤리·올바른 사용","기타"]},
+         {type:"textarea", id:"message", label:"한 문장 핵심 메시지",
+          ph:'예: "댓글 한 줄, 누군가에겐 큰 상처가 됩니다"', rows:2}
+       ]},
+      {id:"s2", n:"STEP 2", t:"스토리 짜기 (기승전결)",
+       hint:"이야기의 큰 흐름을 4단계로 잡아요. 문제 → 변화 → 메시지 순서가 좋아요.",
+       fields:[
+         {type:"textarea", id:"start", label:"① 시작 (문제 상황 보여주기)"},
+         {type:"textarea", id:"mid", label:"② 전개 (어떤 일이 벌어지나)"},
+         {type:"textarea", id:"turn", label:"③ 전환 (해결·깨달음)"},
+         {type:"textarea", id:"end", label:"④ 마무리 (핵심 메시지·행동 제안)"}
+       ]},
+      {id:"s3", n:"STEP 3", t:"장면별 스토리보드 & 프롬프트",
+       hint:"컷마다 장면·프롬프트·자막을 적어요. 4컷이면 ①~④, 6컷이면 ①~⑥까지.",
+       fields:[{type:"storyboard", id:"cuts", cuts:[
+         {t:"① 0~8초"},{t:"② 8~16초"},{t:"③ 16~24초"},
+         {t:"④ 24~32초"},{t:"⑤ 32~45초"},{t:"⑥ 45~60초"}
+       ]}]},
+      {id:"s4", n:"STEP 4", t:"자막 · 음악 · 편집으로 완성",
+       fields:[{type:"checklist", id:"finish", items:[
+         "8초 클립들을 컷 순서대로 배치했다 (4~6개)",
+         "각 장면에 핵심 자막을 짧게 넣었다 (한 줄로!)",
+         "마지막 컷에 핵심 메시지 또는 행동 제안을 넣었다",
+         "주제 분위기에 맞는 배경음악을 골랐다",
+         "전체 길이가 30초~1분 사이인지 확인했다",
+         "글자가 화면 밖으로 나가거나 너무 빨리 지나가지 않는지 확인했다"
+       ]}]},
+      {id:"s5", n:"STEP 5", t:"되돌아보기 & 발표 준비",
+       fields:[{type:"textarea", id:"reflect",
+         label:"내가 생각한 대로 잘 만들어졌는지, 프롬프트를 어떻게 써야 잘 나오는지 적어봐요.", rows:3}]}
+    ]
+  }
+};
+
+/* 선생님용 수업 설명 자료 + 예시문 */
+const TEACHER = {
+  poster_low:{
+    overview:"초등 1~3학년이 ChatGPT·Gemini로 '달 탐사' 주제 포스터를 만드는 입문 수업입니다. 교사가 프롬프트 입력을 함께 도와주며, 결과 이미지를 한 장 고르고 이유를 말하게 합니다.",
+    flow:["도입: 달·우주 사진을 보여주며 상상 자극 (10분)","STEP 1~2: 보고 싶은 장면을 단어로 쪼개기 (15분)","STEP 3: 단어를 한 문장으로 잇기 → 교사가 입력 도움 (15분)","STEP 4~5: 그림 고르고 이유 말하기, 자랑하기 (15분)"],
+    tips:["프롬프트는 교사가 함께 말로 풀어 입력을 도와주세요.","결과 이미지는 1장만 고르고 \"왜 골랐는지\" 말하게 하세요.","무섭거나 폭력적인 장면은 피하고 밝고 동화 같은 분위기로 유도하세요."],
+    examples:[
+      {q:"단어 쪼개기 예시", a:"누가? 우주복 입은 귀여운 큐비 / 어디? 별이 반짝이는 달 위 / 무엇? 깃발을 꽂고 서 있다"},
+      {q:"완성 프롬프트 예시", a:"별이 반짝이는 달 위에서 우주복을 입은 귀여운 곰 캐릭터가 깃발을 꽂는 모습, 밝고 동화 같은 3D 애니메이션 그림"}
+    ]
+  },
+  poster_high:{
+    overview:"초등 4~6학년이 '2050년 미래도시'를 주제로 프롬프트 4요소(주인공·배경·색감·스타일)를 스스로 설계하고, 한글→영어 번역과 결과 분석·개선까지 경험하는 심화 수업입니다.",
+    flow:["도입: 미래도시 영상·질문으로 동기부여 (10분)","STEP 1~3: 제목·메시지·요소·프롬프트 매트릭스 작성 (25분)","STEP 4: 문장 완성 후 파파고·DeepL로 영어화 (15분)","STEP 5~7: 결과 분석·개선·인터뷰 (25분)"],
+    tips:["학생이 스스로 4요소 칸을 채우도록 안내하세요.","결과가 아쉬우면 한 부분씩만 바꿔 다시 생성하게 하세요 (개선 과정이 핵심).","AI 결과를 그대로 베끼지 않고 자기 생각을 더하게 하세요."],
+    examples:[
+      {q:"프롬프트 매트릭스 예시", a:"주인공: 하늘을 나는 투명한 드론 택시 / 배경: 나무와 폭포가 어우러진 빌딩 숲 / 색감: 맑은 낮, 활기찬 분위기 / 스타일: 사실적인 8K 시네마틱 렌더링"},
+      {q:"영어 프롬프트 예시", a:"Flying transparent drone taxis over an eco-friendly city with vertical gardens and waterfalls, bright sunny day, photorealistic 8K cinematic render"}
+    ]
+  },
+  video:{
+    overview:"초6~중등이 '안전한 디지털 세상'을 주제로 30초~1분 공익영상을 만드는 마스터 과정입니다. Google Vids의 8초 클립 제약을 활용해, 8초 컷 4~6개를 스토리보드로 설계하고 자막·음악으로 완성합니다.",
+    flow:["도입: 공익광고 사례 감상, 메시지 정하기 (10분)","STEP 1~2: 주제·핵심 메시지·기승전결 스토리 (15분)","STEP 3: 컷별 스토리보드 & 프롬프트 작성 (25분)","STEP 4~5: 클립 생성·편집·자막·발표 (40분+)"],
+    tips:["한 컷(8초)에는 한 장면만 담게 하세요. 욕심내면 결과가 흐려집니다.","무섭거나 폭력적인 장면은 '슬픈 표정', '혼자 있는 모습'처럼 부드럽게 표현하도록 지도하세요.","Vids·Flow 무료 영상 생성은 보통 만 18세 이상 계정 기준이라, 선생님 계정으로 시연·생성하는 것이 안전합니다."],
+    examples:[
+      {q:"기승전결 예시 (악성 댓글)", a:"시작: 한 학생이 댓글을 읽고 표정이 어두워진다 / 전개: 댓글이 쌓여간다 / 전환: 누군가 따뜻한 댓글을 단다 / 마무리: '댓글 한 줄, 응원이 됩니다' 자막"},
+      {q:"컷 프롬프트 예시", a:"교실에서 혼자 휴대폰을 보며 슬픈 표정을 짓는 중학생, 창밖 흐린 하늘, 차분하고 쓸쓸한 분위기, 부드러운 실사풍 영상"}
+    ]
+  }
+};
+
+/* ============================================================
+   STORAGE LAYER  (Firebase Firestore + localStorage 하이브리드)
+   ── Firebase 설정이 있으면 클라우드에 저장(어디서나 열기) ──
+   ── 설정이 없으면 자동으로 이 기기 localStorage에 저장 ──
+   ============================================================ */
+const CLOUD = {
+  ready:false, db:null, storage:null,
+  CFG_KEY:"quvia_fb_cfg",
+  getConfig(){ try{ const v=localStorage.getItem(this.CFG_KEY); return v?JSON.parse(v):null; }catch(e){ return null; } },
+  setConfig(cfg){ localStorage.setItem(this.CFG_KEY, JSON.stringify(cfg)); },
+  clearConfig(){ localStorage.removeItem(this.CFG_KEY); },
+  init(){
+    const cfg=this.getConfig();
+    if(!cfg || !cfg.projectId || !window.firebase){ this.ready=false; return false; }
+    try{
+      if(!firebase.apps.length) firebase.initializeApp(cfg);
+      this.db=firebase.firestore();
+      try{ this.storage=firebase.storage(); }catch(e){ this.storage=null; }
+      this.ready=true; return true;
+    }catch(e){ console.error("Firebase init 실패:",e); this.ready=false; return false; }
+  },
+  // 한 학생의 모든 활동지 문서를 가져옴 → { wsId: work }
+  async loadStudent(sk){
+    if(!this.ready) return null;
+    const snap=await this.db.collection("students").doc(sk).collection("works").get();
+    const out={};
+    snap.forEach(d=>{ out[d.id]=d.data(); });
+    return out;
+  },
+  async saveWork(sk, wsId, work){
+    if(!this.ready) return false;
+    await this.db.collection("students").doc(sk).collection("works").doc(wsId).set(work);
+    return true;
+  },
+  // 영상 등 큰 파일은 Storage에 업로드하고 URL만 반환 (Firestore 1MB 제한 회피)
+  async uploadBlob(sk, wsId, file){
+    if(!this.ready || !this.storage) return null;
+    const path=`students/${sk}/${wsId}/${Date.now()}_${file.name.replace(/[^\w.\-]/g,"_")}`;
+    const ref=this.storage.ref().child(path);
+    await ref.put(file);
+    return await ref.getDownloadURL();
+  }
+};
+
+const DB = {
+  K_USER:"quvia_user",
+  K_DATA:"quvia_data",
+  _store:{},          // 메모리 캐시: { "<wsId>": work }  (현재 로그인 학생)
+  _mode:"local",      // "cloud" | "local"
+  load(key, def){ try{ const v=localStorage.getItem(key); return v?JSON.parse(v):def; }catch(e){ return def; } },
+  save(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ toast("저장 공간이 가득 찼어요"); } },
+  getUser(){ return this.load(this.K_USER, null); },
+  setUser(u){ this.save(this.K_USER, u); },
+  clearUser(){ localStorage.removeItem(this.K_USER); this._store={}; },
+  studentKey(u){ return (u.name+"__"+u.birth).replace(/\s/g,""); },
+  isCloud(){ return this._mode==="cloud"; },
+
+  // 로그인 직후 호출: 해당 학생 데이터를 메모리로 적재
+  async loadUserData(u){
+    const sk=this.studentKey(u);
+    if(CLOUD.ready){
+      try{
+        const data=await CLOUD.loadStudent(sk);
+        this._store = data || {};
+        this._mode="cloud";
+        // 이 기기 localStorage에도 백업 캐시
+        const all=this.load(this.K_DATA,{}); all[sk]=this._store; this.save(this.K_DATA, all);
+        return;
+      }catch(e){ console.error("클라우드 로드 실패, 로컬 사용:",e); }
+    }
+    // 로컬 폴백
+    const all=this.load(this.K_DATA,{});
+    this._store = all[sk] || {};
+    this._mode="local";
+  },
+
+  getWork(u, wsId){
+    const w=this._store[wsId];
+    return w ? w : {answers:{}, media:[], papers:[], updatedAt:null};
+  },
+
+  saveWork(u, wsId, work){
+    const sk=this.studentKey(u);
+    work.updatedAt=Date.now();
+    this._store[wsId]=work;
+    // 1) 로컬 캐시 항상 저장 (오프라인 안전망)
+    const all=this.load(this.K_DATA,{}); if(!all[sk])all[sk]={}; all[sk][wsId]=work; this.save(this.K_DATA, all);
+    // 2) 클라우드에도 저장 (비동기, 실패해도 로컬은 안전)
+    if(CLOUD.ready){
+      CLOUD.saveWork(sk, wsId, work).catch(e=>{ console.error("클라우드 저장 실패:",e); toast("클라우드 저장 실패 — 이 기기에는 저장됨"); });
+    }
+  }
+};
+
+/* ---------------- small helpers ---------------- */
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>(s==null?"":String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),2000); }
+function fmtDate(ts){ if(!ts)return "저장 안 됨"; const d=new Date(ts); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
+function initials(name){ return (name||"?").trim().slice(0,2); }
+
+/* image downscaling for storage friendliness */
+function fileToScaledDataURL(file, maxDim=1280, quality=.82){
+  return new Promise((resolve,reject)=>{
+    if(file.type.startsWith("video/")){
+      const r=new FileReader(); r.onload=()=>resolve({data:r.result, type:"video"}); r.onerror=reject; r.readAsDataURL(file); return;
+    }
+    const img=new Image(); const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      let {width:w,height:h}=img;
+      if(w>h && w>maxDim){ h=Math.round(h*maxDim/w); w=maxDim; }
+      else if(h>=w && h>maxDim){ w=Math.round(w*maxDim/h); h=maxDim; }
+      const cv=document.createElement("canvas"); cv.width=w; cv.height=h;
+      cv.getContext("2d").drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      resolve({data:cv.toDataURL("image/jpeg",quality), type:"image"});
+    };
+    img.onerror=reject; img.src=url;
+  });
+}
+
+/* ============================================================
+   APP STATE + ROUTER
+   ============================================================ */
+let USER = DB.getUser();
+const ROOT = $("#root");
+
+function render(){
+  if(!USER){ renderLogin(); return; }
+  const hash = location.hash || "#home";
+  if(hash.startsWith("#ws/")){ renderWorksheet(hash.slice(4)); }
+  else if(hash.startsWith("#teacher")){ renderTeacher(); }
+  else { renderHome(); }
+  window.scrollTo(0,0);
+}
+window.addEventListener("hashchange", render);
+
+function topbar(){
+  const isT = USER.role==="teacher";
+  const cloud = CLOUD.ready
+    ? `<span class="cloudpill on" title="클라우드 연결됨">☁️ 연결됨</span>`
+    : `<span class="cloudpill off" onclick="openCloudSetup()" title="이 기기에만 저장 — 눌러서 연결">💾 이 기기</span>`;
+  return `<div class="topbar">
+    <a class="logo" href="#home" style="text-decoration:none">
+      <span class="mark"></span>
+      <span><b>QUVIA-LAB</b><span>큐비아 탐구학원</span></span>
+    </a>
+    <div class="spacer"></div>
+    ${cloud}
+    ${isT?`<a class="btn ghost sm" href="#teacher">📘 수업자료</a>`:``}
+    <div class="who"><span class="avatar">${esc(initials(USER.name))}</span>
+      <span class="nm">${esc(USER.name)} ${isT?'선생님':''}</span></div>
+    <button class="btn ghost sm" onclick="logout()">나가기</button>
+  </div>`;
+}
+
+function logout(){ DB.clearUser(); USER=null; location.hash="#home"; render(); }
+window.logout=logout;
+
+/* ============================================================
+   LOGIN  (이름 + 생년월일)
+   ============================================================ */
+let loginRole="student";
+function renderLogin(){
+  const cloudOn=CLOUD.ready;
+  ROOT.innerHTML = `
+  <div class="login-wrap"><div class="login-card">
+    <div class="login-hero">
+      <div class="eyebrow">QUVIA-LAB · AI 미래인재 프로젝트</div>
+      <h1>AI 창작 활동지</h1>
+      <div class="tag">포스터 · 공익영상 만들기</div>
+    </div>
+    <div class="login-body">
+      <div class="seg" style="margin-bottom:18px">
+        <button class="on" id="segS" onclick="setRole('student')">🧑‍🎓 학생</button>
+        <button id="segT" onclick="setRole('teacher')">👩‍🏫 선생님</button>
+      </div>
+      <div class="login-err" id="loginErr"></div>
+      <div class="field">
+        <label>이름</label>
+        <input class="in" id="inName" placeholder="이름을 입력하세요" autocomplete="off">
+      </div>
+      <div class="field" id="birthField">
+        <label>생년월일</label>
+        <input class="in" id="inBirth" placeholder="예: 20160815 또는 2016-08-15" inputmode="numeric" autocomplete="off">
+        <div class="hint">숫자 8자리로 입력해요 (연도4 · 월2 · 일2)</div>
+      </div>
+      <button class="btn lg" id="loginBtn" style="width:100%;margin-top:6px" onclick="doLogin()">시작하기 →</button>
+      <div style="margin-top:16px;text-align:center;font-size:12.5px;color:var(--gray)">
+        ${cloudOn
+          ? `<span style="color:var(--teal);font-weight:700">● 클라우드 연결됨</span> · 어디서나 이어서 작업할 수 있어요`
+          : `<span style="color:#c99a00;font-weight:700">● 이 기기에만 저장</span> · <a href="#" onclick="openCloudSetup();return false" style="color:var(--purple);font-weight:700">클라우드 연결하기</a>`}
+      </div>
+    </div>
+  </div></div>`;
+  $("#inName").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#inBirth").focus(); });
+  $("#inBirth").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
+}
+function setRole(r){ loginRole=r; $("#segS").classList.toggle("on",r==="student"); $("#segT").classList.toggle("on",r==="teacher"); $("#birthField").classList.toggle("hide", r==="teacher"); }
+window.setRole=setRole;
+
+async function doLogin(){
+  const name=$("#inName").value.trim();
+  const errEl=$("#loginErr");
+  const show=m=>{ errEl.textContent=m; errEl.classList.add("show"); };
+  if(!name){ show("이름을 입력해 주세요."); return; }
+  let birth="";
+  if(loginRole==="student"){
+    birth=$("#inBirth").value.replace(/[^0-9]/g,"");
+    if(birth.length!==8){ show("생년월일을 숫자 8자리로 입력해 주세요. (예: 20160815)"); return; }
+  }
+  USER={name, role:loginRole, birth};
+  DB.setUser(USER);
+  const btn=$("#loginBtn"); if(btn){ btn.disabled=true; btn.textContent="불러오는 중…"; }
+  try{ await DB.loadUserData(USER); }catch(e){ console.error(e); }
+  location.hash="#home"; render();
+}
+window.doLogin=doLogin;
+
+/* ============================================================
+   Firebase 설정 (선생님이 한 번만 입력)
+   ============================================================ */
+function openCloudSetup(){
+  const cfg=CLOUD.getConfig()||{};
+  openModal("☁️ 클라우드 연결 (Firebase)", `
+    <p style="font-size:13.5px;color:var(--gray);margin-bottom:14px;line-height:1.6">
+      Firebase 콘솔에서 만든 웹 앱의 설정값을 붙여넣으세요. 한 번만 입력하면 이 기기에 기억됩니다.
+      각 기기(학원 PC·태블릿·집)에서 한 번씩 같은 값을 넣으면 학생 작업이 모두 연결돼요.
+    </p>
+    <div class="field"><label>apiKey</label><input class="in" id="cfgApiKey" value="${esc(cfg.apiKey||'')}" placeholder="AIza..."></div>
+    <div class="field"><label>authDomain</label><input class="in" id="cfgAuthDomain" value="${esc(cfg.authDomain||'')}" placeholder="프로젝트.firebaseapp.com"></div>
+    <div class="field"><label>projectId</label><input class="in" id="cfgProjectId" value="${esc(cfg.projectId||'')}" placeholder="프로젝트 ID"></div>
+    <div class="field"><label>storageBucket <span style="color:var(--gray);font-weight:400">(영상 저장용, 선택)</span></label><input class="in" id="cfgBucket" value="${esc(cfg.storageBucket||'')}" placeholder="프로젝트.appspot.com"></div>
+    <div class="field"><label>appId</label><input class="in" id="cfgAppId" value="${esc(cfg.appId||'')}" placeholder="1:...:web:..."></div>
+    <div style="display:flex;gap:10px;margin-top:6px">
+      ${cfg.projectId?`<button class="btn ghost" onclick="disconnectCloud()">연결 해제</button>`:''}
+      <div class="spacer" style="flex:1"></div>
+      <button class="btn ghost" onclick="closeModal()">취소</button>
+      <button class="btn" onclick="saveCloudSetup()">연결하기</button>
+    </div>
+    <p style="font-size:12px;color:var(--gray);margin-top:14px">
+      ⚙️ Firebase 콘솔 → 프로젝트 설정 → "내 앱" → SDK 설정 및 구성에서 값을 복사할 수 있어요.
+      Firestore 데이터베이스를 "테스트 모드"로 만들어 두면 바로 작동합니다.
+    </p>`);
+}
+window.openCloudSetup=openCloudSetup;
+function saveCloudSetup(){
+  const cfg={
+    apiKey:$("#cfgApiKey").value.trim(),
+    authDomain:$("#cfgAuthDomain").value.trim(),
+    projectId:$("#cfgProjectId").value.trim(),
+    storageBucket:$("#cfgBucket").value.trim(),
+    appId:$("#cfgAppId").value.trim()
+  };
+  if(!cfg.apiKey||!cfg.projectId){ toast("apiKey와 projectId는 꼭 필요해요"); return; }
+  CLOUD.setConfig(cfg);
+  closeModal();
+  toast("연결 정보를 저장했어요. 새로고침합니다…");
+  setTimeout(()=>location.reload(),700);
+}
+window.saveCloudSetup=saveCloudSetup;
+function disconnectCloud(){
+  if(!confirm("클라우드 연결을 해제할까요? (이 기기 저장본은 유지됩니다)"))return;
+  CLOUD.clearConfig(); closeModal(); toast("연결을 해제했어요. 새로고침합니다…");
+  setTimeout(()=>location.reload(),700);
+}
+window.disconnectCloud=disconnectCloud;
+
+/* ============================================================
+   HOME  (학생: 활동지 카드 / 선생님: 카드 + 수업자료 안내)
+   ============================================================ */
+function progressOf(wsId){
+  const ws=WORKSHEETS[wsId]; const work=DB.getWork(USER, wsId);
+  let total=0, done=0;
+  ws.steps.forEach(st=> st.fields.forEach(f=>{
+    if(f.type==="storyboard"||f.type==="checklist") return; // optional-ish
+    total++;
+    const v=work.answers[st.id+"."+f.id];
+    if(f.type==="checks"){ if(v && ((Array.isArray(v)&&v.length)|| (!Array.isArray(v)&&v!=null && v!=="" ))) done++; }
+    else if(f.type==="matrix"){ if(v && Object.values(v).some(x=>x&&x.trim())) done++; }
+    else { if(v && String(v).trim()) done++; }
+  }));
+  const media=(work.media||[]).length + (work.papers||[]).length;
+  const pct = total? Math.round(done/total*100):0;
+  return {pct, media, updatedAt:work.updatedAt};
+}
+
+function renderHome(){
+  const isT=USER.role==="teacher";
+  const cards = Object.values(WORKSHEETS).map(ws=>{
+    const p=progressOf(ws.id);
+    const started = p.updatedAt!=null;
+    return `<div class="wcard">
+      <div class="top ${ws.cls}">
+        <div class="emoji">${ws.emoji}</div>
+        <div class="lvl">${ws.lvl}</div>
+        <h3>${esc(ws.title)}</h3>
+        <div class="sub">${esc(ws.grade)} · ${esc(ws.theme)}</div>
+      </div>
+      <div class="body">
+        <div class="meta">${esc(ws.intro)}</div>
+        <div class="prog"><i style="width:${p.pct}%"></i></div>
+        <div class="meta" style="display:flex;justify-content:space-between">
+          <span>${started?`작성 ${p.pct}%`:'아직 시작 안 함'}</span>
+          <span>${p.media?`🖼️ ${p.media}`:''} ${started?'· '+fmtDate(p.updatedAt):''}</span>
+        </div>
+        <div class="row">
+          ${isT
+            ? `<a class="btn ghost" href="#teacher" onclick="sessionStorage.setItem('tws','${ws.id}')">📘 수업자료</a>
+               <a class="btn" href="#ws/${ws.id}">미리보기</a>`
+            : `<a class="btn" href="#ws/${ws.id}">${started?'이어서 작성':'활동 시작'}</a>`}
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+
+  ROOT.innerHTML = topbar() + `<div class="app">
+    <div class="page-head">
+      <div class="eyebrow">${isT?'TEACHER':'STUDENT'} · AI 미래인재 프로젝트</div>
+      <h2>${esc(USER.name)}${isT?' 선생님,':'님,'} 환영해요 ${isT?'👋':'🚀'}</h2>
+      <p>${isT?'아래 카드에서 수업 설명 자료와 예시문을 확인하고, 학생 활동지를 미리 볼 수 있어요.':'활동지를 골라 시작해요. 작성한 내용은 자동으로 저장돼요.'}</p>
+    </div>
+    ${isT?`<div style="margin-bottom:18px"><a class="btn gold lg" href="#teacher">📘 수업 설명 자료 전체 보기</a></div>`:''}
+    <div class="grid cards">${cards}</div>
+  </div>`;
+}
+
+/* ============================================================
+   WORKSHEET  (작성/수정/저장 · 미디어 · 저학년 사진)
+   ============================================================ */
+let CUR=null; // {ws, work}
+function renderWorksheet(wsId){
+  const ws=WORKSHEETS[wsId]; if(!ws){ location.hash="#home"; return; }
+  const work=DB.getWork(USER, wsId);
+  CUR={ws, work, wsId};
+
+  const stepsHtml = ws.steps.map(st=>renderStep(ws, st, work)).join("");
+
+  // 저학년 손글씨 사진 섹션
+  const paperHtml = ws.handMode ? `
+    <div class="step">
+      <div class="step-band"><span class="n">PHOTO</span><span class="t">손으로 쓴 활동지 사진 올리기</span></div>
+      <div class="step-body">
+        <div class="step-hint">종이에 손으로 작성했다면, 사진을 찍어 올려요. 여러 장 올릴 수 있어요.</div>
+        <div class="paper-grid" id="paperGrid"></div>
+      </div>
+    </div>` : "";
+
+  const mediaLabel = ws.kind==="video" ? "내가 만든 영상 / 캡처 올리기" : "내가 만든 AI 그림 올리기";
+  const mediaHint = ws.kind==="video"
+    ? "완성한 영상 파일이나 화면 캡처를 올려요. 영상을 누르면 재생 페이지로, 이미지를 누르면 활동지가 열려요."
+    : "AI로 만든 그림을 올려요. 그림을 누르면 이 활동지가 함께 열려요.";
+
+  ROOT.innerHTML = topbar() + `<div class="app">
+    <div class="ws-head">
+      <div class="emoji">${ws.emoji}</div>
+      <div>
+        <div class="eyebrow">${esc(ws.grade)} · ${ws.lvl}</div>
+        <h2>${esc(ws.title)}</h2>
+        <div class="sub">${esc(ws.theme)} · 사용 도구: ${esc(ws.tools)}</div>
+      </div>
+      <div class="spacer" style="flex:1"></div>
+      <a class="btn ghost sm no-print" href="#home">← 목록</a>
+    </div>
+
+    <div id="wsCapture">${stepsHtml}</div>
+
+    <div class="step">
+      <div class="step-band"><span class="n">GALLERY</span><span class="t">${mediaLabel}</span></div>
+      <div class="step-body">
+        <div class="step-hint">${mediaHint}</div>
+        <div class="media-zone" id="mediaZone"></div>
+      </div>
+    </div>
+
+    ${paperHtml}
+
+    <div class="savebar no-print">
+      <span class="status">마지막 저장: <b id="savedAt">${fmtDate(work.updatedAt)}</b></span>
+      <div class="spacer"></div>
+      <button class="btn ghost sm" onclick="exportPDF()">⬇️ PDF로 저장</button>
+      <button class="btn" onclick="saveWork(true)">💾 저장하기</button>
+    </div>
+  </div>`;
+
+  bindFields();
+  renderMedia();
+  if(ws.handMode) renderPapers();
+}
+
+function fieldVal(stId,fId){ return CUR.work.answers[stId+"."+fId]; }
+function setVal(stId,fId,v){ CUR.work.answers[stId+"."+fId]=v; scheduleSave(); }
+
+function renderStep(ws, st, work){
+  const fields = st.fields.map(f=>renderField(st, f)).join("");
+  return `<div class="step">
+    <div class="step-band"><span class="n">${st.n}</span><span class="t">${esc(st.t)}</span></div>
+    <div class="step-body">
+      ${st.hint?`<div class="step-hint">${esc(st.hint)}</div>`:''}
+      ${st.formula?`<div class="formula">${st.formula.replace(/\[([^\]]+)\]/g,'<b>[$1]</b>')}</div>`:''}
+      ${fields}
+    </div>
+  </div>`;
+}
+
+function renderField(st, f){
+  const key=st.id+"."+f.id;
+  const v=fieldVal(st.id,f.id);
+  if(f.type==="input"){
+    return `${f.label?`<div class="lab">${esc(f.label)}</div>`:''}
+      ${f.hint?`<div class="step-hint">${esc(f.hint)}</div>`:''}
+      <input class="in fld" data-k="${key}" type="text" value="${esc(v||'')}" placeholder="${esc(f.ph||'')}">`;
+  }
+  if(f.type==="textarea"){
+    return `${f.label?`<div class="lab">${esc(f.label)}</div>`:''}
+      ${f.hint?`<div class="step-hint">${esc(f.hint)}</div>`:''}
+      <textarea class="in fld" data-k="${key}" rows="${f.rows||2}" placeholder="${esc(f.ph||'')}">${esc(v||'')}</textarea>`;
+  }
+  if(f.type==="checks"){
+    const sel = f.multi ? (Array.isArray(v)?v:[]) : v;
+    const opts=f.options.map(o=>{
+      const on = f.multi ? sel.includes(o) : sel===o;
+      return `<div class="chk ${f.multi?'':'radio'} ${on?'on':''}" data-k="${key}" data-o="${esc(o)}" data-multi="${f.multi?1:0}" onclick="toggleChk(this)">
+        <span class="box">${on?'✓':''}</span><span>${esc(o)}</span></div>`;
+    }).join("");
+    return `<div class="lab">${esc(f.label)}</div><div class="checks">${opts}</div>`;
+  }
+  if(f.type==="matrix"){
+    const data=v||{};
+    const rows=f.rows.map((r,i)=>`<tr>
+      <td class="el">${esc(r.el)}</td>
+      <td><textarea class="mx" data-k="${key}" data-r="${i}" rows="2">${esc(data[i]||'')}</textarea></td>
+      <td class="eg">${esc(r.eg)}</td></tr>`).join("");
+    return `<div class="matrix-scroll"><table class="matrix">
+      <thead><tr><th>프롬프트 요소</th><th>내가 원하는 것 (구체적으로)</th><th>추천 키워드 / 예시</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>`;
+  }
+  if(f.type==="storyboard"){
+    const data=v||{};
+    const cuts=f.cuts.map((c,i)=>{
+      const cd=data[i]||{};
+      return `<div class="cut">
+        <div class="cut-h"><span class="time">${esc(c.t)}</span><span class="t">컷 ${i+1}</span></div>
+        <div class="mini">장면 설명 (무엇이 보이나)</div>
+        <textarea class="sb" data-k="${key}" data-c="${i}" data-p="scene" rows="2">${esc(cd.scene||'')}</textarea>
+        <div class="mini">AI 영상 프롬프트</div>
+        <textarea class="sb" data-k="${key}" data-c="${i}" data-p="prompt" rows="2">${esc(cd.prompt||'')}</textarea>
+        <div class="mini">자막 / 멘트</div>
+        <textarea class="sb" data-k="${key}" data-c="${i}" data-p="caption" rows="1">${esc(cd.caption||'')}</textarea>
+      </div>`;
+    }).join("");
+    return cuts;
+  }
+  if(f.type==="checklist"){
+    const data=Array.isArray(v)?v:[];
+    const items=f.items.map((it,i)=>{
+      const on=data.includes(i);
+      return `<div class="chk ${on?'on':''}" data-k="${key}" data-i="${i}" onclick="toggleCheckItem(this)" style="margin-bottom:8px">
+        <span class="box">${on?'✓':''}</span><span>${esc(it)}</span></div>`;
+    }).join("");
+    return `<div style="display:grid;gap:0">${items}</div>`;
+  }
+  return "";
+}
+
+/* field bindings */
+function bindFields(){
+  $$(".fld").forEach(el=>{
+    el.addEventListener("input",()=>{ const [s,f]=el.dataset.k.split("."); setVal(s,f, el.value); });
+  });
+  $$(".mx").forEach(el=>{
+    el.addEventListener("input",()=>{
+      const [s,f]=el.dataset.k.split("."); const i=el.dataset.r;
+      const cur=fieldVal(s,f)||{}; cur[i]=el.value; setVal(s,f,cur);
+    });
+  });
+  $$(".sb").forEach(el=>{
+    el.addEventListener("input",()=>{
+      const [s,f]=el.dataset.k.split("."); const c=el.dataset.c, p=el.dataset.p;
+      const cur=fieldVal(s,f)||{}; if(!cur[c])cur[c]={}; cur[c][p]=el.value; setVal(s,f,cur);
+    });
+  });
+}
+function toggleChk(el){
+  const [s,f]=el.dataset.k.split("."); const o=el.dataset.o; const multi=el.dataset.multi==="1";
+  if(multi){
+    let cur=fieldVal(s,f); cur=Array.isArray(cur)?cur.slice():[];
+    const idx=cur.indexOf(o); if(idx>=0)cur.splice(idx,1); else cur.push(o);
+    setVal(s,f,cur);
+    el.classList.toggle("on"); el.querySelector(".box").textContent=el.classList.contains("on")?"✓":"";
+  }else{
+    setVal(s,f,o);
+    el.parentElement.querySelectorAll(".chk").forEach(c=>{ c.classList.remove("on"); c.querySelector(".box").textContent=""; });
+    el.classList.add("on"); el.querySelector(".box").textContent="✓";
+  }
+}
+window.toggleChk=toggleChk;
+function toggleCheckItem(el){
+  const [s,f]=el.dataset.k.split("."); const i=parseInt(el.dataset.i);
+  let cur=fieldVal(s,f); cur=Array.isArray(cur)?cur.slice():[];
+  const idx=cur.indexOf(i); if(idx>=0)cur.splice(idx,1); else cur.push(i);
+  setVal(s,f,cur);
+  el.classList.toggle("on"); el.querySelector(".box").textContent=el.classList.contains("on")?"✓":"";
+}
+window.toggleCheckItem=toggleCheckItem;
+
+/* autosave (debounced) */
+let saveTimer=null;
+function scheduleSave(){ clearTimeout(saveTimer); saveTimer=setTimeout(()=>saveWork(false), 800); }
+function saveWork(manual){
+  DB.saveWork(USER, CUR.wsId, CUR.work);
+  const el=$("#savedAt"); if(el) el.textContent=fmtDate(CUR.work.updatedAt);
+  if(manual) toast("저장했어요 ✓");
+}
+window.saveWork=saveWork;
+
+/* ============================================================
+   MEDIA  (학생이 만든 그림/영상)  +  저학년 종이 사진
+   ============================================================ */
+function renderMedia(){
+  const zone=$("#mediaZone"); if(!zone) return;
+  const media=CUR.work.media||[];
+  const isVideo=CUR.ws.kind==="video";
+  const accept=isVideo?"image/*,video/*":"image/*";
+  let html=`<label class="media-add">
+      <span class="ic">${isVideo?'🎬':'🖼️'}</span>
+      <span>${isVideo?'영상·캡처 추가':'그림 추가'}</span>
+      <input type="file" accept="${accept}" multiple style="display:none" onchange="onMediaPick(event)">
+    </label>`;
+  media.forEach((m,i)=>{
+    if(m.type==="video"){
+      const src=m.url||m.data||"";
+      html+=`<div class="media-item" onclick="openMedia(${i})">
+        <video src="${src}" muted preload="metadata"></video>
+        <div class="vbadge">▶ 영상</div>
+        <div class="play">▶</div>
+        <button class="del" onclick="event.stopPropagation();delMedia(${i})">✕</button>
+        <div class="tagline">${esc(m.name||'영상')}</div></div>`;
+    }else{
+      html+=`<div class="media-item" onclick="openMedia(${i})">
+        <img src="${m.data}" alt="">
+        <button class="del" onclick="event.stopPropagation();delMedia(${i})">✕</button>
+        <div class="tagline">눌러서 활동지 보기</div></div>`;
+    }
+  });
+  zone.innerHTML=html;
+}
+async function onMediaPick(e){
+  const files=[...e.target.files]; if(!files.length)return;
+  toast("불러오는 중…");
+  const sk=DB.studentKey(USER);
+  for(const file of files){
+    try{
+      const isVid=file.type.startsWith("video/");
+      if(isVid){
+        // 영상이 크면 Firestore(1MB)에 못 들어가므로 Storage로 업로드 → URL만 저장
+        if(CLOUD.ready && CLOUD.storage){
+          toast("영상 올리는 중… 잠시만요");
+          try{
+            const url=await CLOUD.uploadBlob(sk, CUR.wsId, file);
+            CUR.work.media.push({type:"video", url, name:file.name, at:Date.now()});
+            continue;
+          }catch(err){ console.error(err); /* 폴백: 아래 인라인 처리 */ }
+        }
+        // 폴백(로컬 또는 Storage 미설정): 작은 영상만 인라인, 크면 안내
+        if(file.size > 4*1024*1024){
+          toast("영상이 커서 클라우드(Storage) 연결이 필요해요");
+          continue;
+        }
+        const r=await fileToScaledDataURL(file);
+        CUR.work.media.push({type:"video", data:r.data, name:file.name, at:Date.now()});
+      }else{
+        const r=await fileToScaledDataURL(file);
+        CUR.work.media.push({type:"image", data:r.data, name:file.name, at:Date.now()});
+      }
+    }catch(err){ console.error(err); toast("일부 파일을 불러오지 못했어요"); }
+  }
+  saveWork(false); renderMedia(); toast("올렸어요 ✓");
+  e.target.value="";
+}
+window.onMediaPick=onMediaPick;
+function delMedia(i){ if(!confirm("이 항목을 지울까요?"))return; CUR.work.media.splice(i,1); saveWork(false); renderMedia(); }
+window.delMedia=delMedia;
+
+function renderPapers(){
+  const grid=$("#paperGrid"); if(!grid)return;
+  const papers=CUR.work.papers||[];
+  let html=`<label class="media-add">
+      <span class="ic">📷</span><span>활동지 사진 찍기</span>
+      <input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="onPaperPick(event)">
+    </label>`;
+  papers.forEach((p,i)=>{
+    html+=`<div class="paper-shot" onclick="openPaper(${i})">
+      <img src="${p.data}" alt="">
+      <span class="pg">${i+1}쪽</span>
+      <button class="del" onclick="event.stopPropagation();delPaper(${i})">✕</button></div>`;
+  });
+  grid.innerHTML=html;
+}
+async function onPaperPick(e){
+  const files=[...e.target.files]; if(!files.length)return;
+  toast("불러오는 중…");
+  for(const file of files){
+    try{ const r=await fileToScaledDataURL(file,1600,.85); CUR.work.papers.push({data:r.data, at:Date.now()}); }
+    catch(err){ toast("사진을 불러오지 못했어요"); }
+  }
+  saveWork(false); renderPapers(); toast("사진을 올렸어요 ✓");
+  e.target.value="";
+}
+window.onPaperPick=onPaperPick;
+function delPaper(i){ if(!confirm("이 사진을 지울까요?"))return; CUR.work.papers.splice(i,1); saveWork(false); renderPapers(); }
+window.delPaper=delPaper;
+
+/* ============================================================
+   LIGHTBOX
+   - 이미지 클릭 → 활동지 요약이 함께 열림
+   - 영상 클릭 → 영상 재생 페이지(전체화면 재생)로
+   ============================================================ */
+function answersSummary(ws, work){
+  const rows=[];
+  ws.steps.forEach(st=>st.fields.forEach(f=>{
+    const v=work.answers[st.id+"."+f.id];
+    if(v==null||v==="")return;
+    let txt="";
+    if(f.type==="checks") txt=Array.isArray(v)?v.join(", "):v;
+    else if(f.type==="matrix"){ txt=Object.values(v).filter(x=>x&&x.trim()).join(" / "); }
+    else if(f.type==="storyboard"){ txt=Object.values(v).map(c=>c.scene).filter(Boolean).join(" → "); }
+    else if(f.type==="checklist"){ txt=v.length+"개 완료"; }
+    else txt=v;
+    if(txt&&String(txt).trim()) rows.push(`<div style="margin-bottom:8px"><b style="color:var(--gold)">${esc(f.label||st.t)}</b><br>${esc(txt)}</div>`);
+  }));
+  return rows.join("")||"<i>아직 작성한 내용이 없어요.</i>";
+}
+function openMedia(i){
+  const m=CUR.work.media[i]; const ws=CUR.ws; const lb=$("#lightbox");
+  if(m.type==="video"){
+    const src=m.url||m.data||"";
+    lb.innerHTML=`<div class="lb-close" onclick="closeLB()">✕</div>
+      <video src="${src}" controls autoplay playsinline></video>
+      <div class="cap">🎬 ${esc(m.name||'내 영상')} · ${esc(ws.theme)}</div>
+      <div class="lb-actions">
+        <a class="btn gold" href="${src}" download="${esc(m.name||'video')}" target="_blank">⬇️ 영상 저장</a>
+        <button class="btn ghost" onclick="closeLB()">닫기</button>
+      </div>`;
+  }else{
+    lb.innerHTML=`<div class="lb-close" onclick="closeLB()">✕</div>
+      <img src="${m.data}" alt="">
+      <div class="cap">🖼️ ${esc(ws.title)} · ${esc(ws.theme)}</div>
+      <div class="lb-actions">
+        <button class="btn" onclick="showWSFromImage()">📋 활동지 내용 보기</button>
+        <a class="btn ghost" href="${m.data}" download="my-art.jpg">⬇️ 그림 저장</a>
+      </div>`;
+  }
+  lb.classList.add("show");
+}
+window.openMedia=openMedia;
+function showWSFromImage(){
+  const ws=CUR.ws, work=CUR.work;
+  openModal(`${ws.emoji} ${ws.title} — ${ws.theme}`, answersSummary(ws, work)
+    + `<div style="margin-top:16px;text-align:right"><button class="btn" onclick="closeModal()">닫기</button></div>`);
+}
+window.showWSFromImage=showWSFromImage;
+function openPaper(i){
+  const p=CUR.work.papers[i]; const lb=$("#lightbox");
+  lb.innerHTML=`<div class="lb-close" onclick="closeLB()">✕</div>
+    <img src="${p.data}" alt="">
+    <div class="cap">📷 손으로 쓴 활동지 ${i+1}쪽</div>
+    <div class="lb-actions"><a class="btn ghost" href="${p.data}" download="worksheet-${i+1}.jpg">⬇️ 저장</a>
+      <button class="btn" onclick="closeLB()">닫기</button></div>`;
+  lb.classList.add("show");
+}
+window.openPaper=openPaper;
+function closeLB(){ const lb=$("#lightbox"); const v=lb.querySelector("video"); if(v)v.pause(); lb.classList.remove("show"); lb.innerHTML=""; }
+window.closeLB=closeLB;
+$("#lightbox").addEventListener("click",e=>{ if(e.target.id==="lightbox") closeLB(); });
+
+/* ============================================================
+   MODAL
+   ============================================================ */
+function openModal(title, bodyHtml){
+  $("#modalEl").innerHTML=`<div class="modal-head"><h3>${title}</h3><button class="close" onclick="closeModal()">✕</button></div><div class="modal-body">${bodyHtml}</div>`;
+  $("#modalBg").classList.add("show");
+}
+function closeModal(){ $("#modalBg").classList.remove("show"); }
+window.openModal=openModal; window.closeModal=closeModal;
+$("#modalBg").addEventListener("click",e=>{ if(e.target.id==="modalBg") closeModal(); });
+
+/* ============================================================
+   PDF 내보내기  (활동지 입력 내용 → PDF)
+   ============================================================ */
+async function exportPDF(){
+  const node=$("#wsCapture"); if(!node)return;
+  toast("PDF 만드는 중…");
+  try{
+    const canvas=await html2canvas(node,{scale:2, backgroundColor:"#ffffff", useCORS:true});
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF("p","mm","a4");
+    const pw=210, ph=297, margin=8;
+    const iw=pw-margin*2;
+    const ih=canvas.height*iw/canvas.width;
+    const img=canvas.toDataURL("image/jpeg",.92);
+    pdf.setFillColor(74,47,168); pdf.rect(0,0,pw,4,"F");
+    if(ih<=ph-margin*2){
+      pdf.addImage(img,"JPEG",margin,margin,iw,ih);
+    }else{
+      const pageH=ph-margin*2;
+      const ratio=canvas.width/iw;
+      let sY=0;
+      while(sY<canvas.height){
+        const sliceH=Math.min(pageH*ratio, canvas.height-sY);
+        const c2=document.createElement("canvas"); c2.width=canvas.width; c2.height=sliceH;
+        c2.getContext("2d").drawImage(canvas,0,sY,canvas.width,sliceH,0,0,canvas.width,sliceH);
+        if(sY>0) pdf.addPage();
+        pdf.addImage(c2.toDataURL("image/jpeg",.92),"JPEG",margin,margin,iw,sliceH/ratio);
+        sY+=sliceH;
+      }
+    }
+    const fn=`${USER.name}_${CUR.ws.title}_${CUR.ws.theme}`.replace(/[\\/:*?"<>|\s]/g,"_");
+    pdf.save(fn+".pdf");
+    toast("PDF로 저장했어요 ✓");
+  }catch(e){ console.error(e); toast("PDF 저장에 실패했어요"); }
+}
+window.exportPDF=exportPDF;
+
+/* ============================================================
+   TEACHER  (수업 설명 자료 + 예시문)
+   ============================================================ */
+function renderTeacher(){
+  const pre=sessionStorage.getItem('tws');
+  let active = pre && WORKSHEETS[pre] ? pre : "poster_low";
+  sessionStorage.removeItem('tws');
+
+  function paint(wsId){
+    const ws=WORKSHEETS[wsId]; const T=TEACHER[wsId];
+    $("#tBody").innerHTML=`
+      <div class="tcard">
+        <h3><span class="pin">📌</span>${esc(ws.title)} — ${esc(ws.grade)}</h3>
+        <p>${esc(T.overview)}</p>
+      </div>
+      <div class="tcard">
+        <h3>🕒 수업 흐름</h3>
+        <ul>${T.flow.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
+      </div>
+      <div class="tcard">
+        <h3>🎯 지도 포인트</h3>
+        <ul>${T.tips.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
+      </div>
+      <div class="tcard">
+        <h3>✏️ 예시문</h3>
+        ${T.examples.map(e=>`<div class="example"><div class="q">${esc(e.q)}</div><div class="a">${esc(e.a)}</div></div>`).join("")}
+      </div>
+      <div class="tcard">
+        <h3>📄 학생 활동지</h3>
+        <p>학생이 보게 될 활동지를 그대로 미리 볼 수 있어요.</p>
+        <a class="btn" href="#ws/${ws.id}">활동지 미리보기 →</a>
+      </div>`;
+    $$("#tTabs .tab").forEach(t=>t.classList.toggle("on", t.dataset.w===wsId));
+  }
+
+  ROOT.innerHTML = topbar() + `<div class="app">
+    <div class="page-head">
+      <div class="eyebrow">TEACHER · 수업 설명 자료</div>
+      <h2>수업 자료 & 예시문 📘</h2>
+      <p>과정을 선택하면 수업 개요·흐름·지도 포인트·예시문을 볼 수 있어요.</p>
+    </div>
+    <div class="tabs" id="tTabs">
+      ${Object.values(WORKSHEETS).map(ws=>`<button class="tab" data-w="${ws.id}" onclick="tSel('${ws.id}')">${ws.emoji} ${esc(ws.grade)}</button>`).join("")}
+    </div>
+    <div id="tBody"></div>
+  </div>`;
+  window.tSel=(id)=>paint(id);
+  paint(active);
+}
+
+/* ---------------- boot ---------------- */
+(async function boot(){
+  CLOUD.init();                       // 설정이 있으면 Firebase 연결
+  if(USER){                           // 이미 로그인된 상태면 데이터 적재
+    try{ await DB.loadUserData(USER); }catch(e){ console.error(e); }
+  }
+  render();
+})();
+</script>
+</body>
+</html>
