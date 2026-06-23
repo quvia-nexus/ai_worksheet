@@ -147,6 +147,7 @@ img{max-width:100%;display:block}
 .ws-head .eyebrow{font-size:11px;font-weight:800;letter-spacing:2px;color:#cfc3ff}
 .ws-head h2{font-size:22px;font-weight:900}
 .ws-head .sub{font-size:13px;color:var(--gold);font-weight:700;margin-top:2px}
+.ws-notice{background:#fff7e0;border:1.5px solid #f2d27a;border-radius:14px;padding:13px 17px;margin-bottom:18px;font-size:13.5px;font-weight:600;color:#7a5a00;line-height:1.6}
 
 .step{background:#fff;border-radius:var(--r);box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden}
 .step-band{background:var(--purple);color:#fff;padding:13px 20px;display:flex;align-items:center;gap:10px;font-weight:900}
@@ -234,7 +235,23 @@ textarea.in:focus,input.in:focus{outline:none;border-color:var(--purple);backgro
 .example{background:var(--lav);border-left:4px solid var(--gold);border-radius:0 12px 12px 0;padding:13px 16px;margin:10px 0;font-size:14px}
 .example .q{font-weight:700;color:var(--purple-dk);margin-bottom:4px}
 .example .a{color:var(--ink);font-style:italic}
-.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;align-items:center}
+.sub-list{display:flex;flex-direction:column;gap:10px}
+.sub-count{font-size:13px;color:var(--gray);font-weight:700;margin-bottom:4px}
+.sub-row{display:flex;align-items:center;gap:14px;background:#fff;border-radius:14px;box-shadow:var(--shadow);padding:14px 18px;text-decoration:none;color:var(--ink);transition:.14s;border:1.5px solid transparent}
+.sub-row:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);border-color:var(--purple-lt)}
+.sub-ic{font-size:26px;flex:none}
+.sub-main{display:flex;flex-direction:column;min-width:0;flex:1}
+.sub-name{font-weight:900;font-size:15px;color:var(--purple-dk)}
+.sub-file{font-size:12px;color:var(--gray);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub-meta{display:flex;flex-direction:column;align-items:flex-end;gap:2px;text-align:right;flex:none}
+.sub-ws{font-size:12.5px;color:var(--ink);font-weight:600}
+.sub-time{font-size:11px;color:var(--gray)}
+.sub-open{font-size:13px;font-weight:800;color:var(--purple);white-space:nowrap;flex:none}
+@media(max-width:640px){
+  .sub-meta{display:none}
+  .sub-open{font-size:12px}
+}
 .tab{padding:10px 16px;border-radius:12px;font-weight:700;font-size:14px;background:#fff;color:var(--gray);box-shadow:var(--shadow);transition:.13s}
 .tab.on{background:var(--purple);color:#fff}
 
@@ -308,7 +325,7 @@ const WORKSHEETS = {
          {type:"checks", id:"style", label:"④ 어떤 그림 느낌으로 만들까요?", multi:false,
           options:["귀여운 일러스트","3D 애니메이션","디즈니 느낌","진짜 같은 사진","만화 스타일","수채화"]}
        ]},
-      {id:"s3", n:"STEP 3", t:"한 문장으로 이어 붙이기",
+      {id:"s3", n:"STEP 3", t:"한 문장으로 이어 붙여서 프롬프트 완성하기",
        formula:"[어디]에서 [누가]가 [무엇]을 하는 [그림 느낌] 그림을 그려줘.",
        fields:[{type:"textarea", id:"sentence", label:"내가 만든 문장", rows:3}]},
       {id:"s4", n:"STEP 4", t:"AI 그림 보고 생각하기",
@@ -351,11 +368,10 @@ const WORKSHEETS = {
          {el:"색감 / 분위기", eg:"예: 신비로운 보라빛 우주, 따뜻한 낮"},
          {el:"그림 스타일", eg:"예: 3D 애니메이션, 사실적인 8K 렌더링"}
        ]}]},
-      {id:"s4", n:"STEP 4", t:"프롬프트 문장 완성 & 영어로 다듬기",
+      {id:"s4", n:"STEP 4", t:"프롬프트 문장 완성하기",
        formula:"[배경]에서 [주인공]이 [행동]을 하는, [색감·분위기]의 [그림 스타일] 포스터를 만들어줘.",
        fields:[
-         {type:"textarea", id:"ko", label:"① 내가 쓴 한글 프롬프트", rows:2},
-         {type:"textarea", id:"en", label:"② 영어로 바꾼 프롬프트", hint:"파파고·DeepL로 번역해 보세요.", rows:2}
+         {type:"textarea", id:"ko", label:"내가 쓴 프롬프트", rows:3}
        ]},
       {id:"s5", n:"STEP 5", t:"결과 분석하기",
        fields:[
@@ -375,10 +391,11 @@ const WORKSHEETS = {
 
   video: {
     id:"video", kind:"video", grade:"초6~중등 (마스터과정)",
-    title:"AI 공익영상 만들기", theme:"안전한 디지털 세상 · 30초~1분",
+    title:"AI 공익영상 만들기", theme:"안전한 디지털 세상 · 30초",
     emoji:"🎬", cls:"video", lvl:"LV.5 MASTER",
-    tools:"Google Vids 등", handMode:false,
-    intro:"8초 클립을 4~6개 이어 붙여 30초~1분 공익영상을 완성해요.",
+    tools:"에듀핏ai · 캔바 · Veo", handMode:false,
+    intro:"5초 클립을 6개 이어 붙여 30초 공익영상을 완성해요.",
+    notice:"에듀핏ai는 한 번에 약 5초 영상을 만들어요. 에듀핏톡 단체방 「U3M9XE」에 들어와 친구들과 함께 작업하고, 5초 영상 기준 최대 30개까지 만들어 저장할 수 있어요.",
     steps:[
       {id:"s1", n:"STEP 1", t:"공익 메시지 정하기",
        hint:"'안전한 디지털 세상'을 주제로 전하고 싶은 한 가지 메시지를 정해요.",
@@ -389,7 +406,7 @@ const WORKSHEETS = {
           ph:'예: "댓글 한 줄, 누군가에겐 큰 상처가 됩니다"', rows:2}
        ]},
       {id:"s2", n:"STEP 2", t:"스토리 짜기 (기승전결)",
-       hint:"이야기의 큰 흐름을 4단계로 잡아요. 문제 → 변화 → 메시지 순서가 좋아요.",
+       hint:"이야기의 큰 흐름을 4단계로 잡아요. 다음 단계에서 5초 컷 6개로 나눠 담아요. 문제 → 변화 → 메시지 순서가 좋아요.",
        fields:[
          {type:"textarea", id:"start", label:"① 시작 (문제 상황 보여주기)"},
          {type:"textarea", id:"mid", label:"② 전개 (어떤 일이 벌어지나)"},
@@ -397,18 +414,19 @@ const WORKSHEETS = {
          {type:"textarea", id:"end", label:"④ 마무리 (핵심 메시지·행동 제안)"}
        ]},
       {id:"s3", n:"STEP 3", t:"장면별 스토리보드 & 프롬프트",
-       hint:"컷마다 장면·프롬프트·자막을 적어요. 4컷이면 ①~④, 6컷이면 ①~⑥까지.",
+       hint:"컷마다 장면·프롬프트·자막을 적어요. 5초 컷 6개로 30초를 채워요. 프롬프트는 [누가/무엇] + [어디서] + [어떤 행동·분위기] + [영상 스타일] 순서로!",
        fields:[{type:"storyboard", id:"cuts", cuts:[
-         {t:"① 0~8초"},{t:"② 8~16초"},{t:"③ 16~24초"},
-         {t:"④ 24~32초"},{t:"⑤ 32~45초"},{t:"⑥ 45~60초"}
+         {t:"① 0~5초"},{t:"② 5~10초"},{t:"③ 10~15초"},
+         {t:"④ 15~20초"},{t:"⑤ 20~25초"},{t:"⑥ 25~30초"}
        ]}]},
       {id:"s4", n:"STEP 4", t:"자막 · 음악 · 편집으로 완성",
+       hint:"만든 5초 클립 6개를 캡컷에서 순서대로 이어 붙이고, 자막과 배경음악을 넣어요.",
        fields:[{type:"checklist", id:"finish", items:[
-         "8초 클립들을 컷 순서대로 배치했다 (4~6개)",
+         "5초 클립 6개를 컷 순서대로 배치했다",
          "각 장면에 핵심 자막을 짧게 넣었다 (한 줄로!)",
          "마지막 컷에 핵심 메시지 또는 행동 제안을 넣었다",
          "주제 분위기에 맞는 배경음악을 골랐다",
-         "전체 길이가 30초~1분 사이인지 확인했다",
+         "전체 길이가 약 30초인지 확인했다",
          "글자가 화면 밖으로 나가거나 너무 빨리 지나가지 않는지 확인했다"
        ]}]},
       {id:"s5", n:"STEP 5", t:"되돌아보기 & 발표 준비",
@@ -439,9 +457,9 @@ const TEACHER = {
     ]
   },
   video:{
-    overview:"초6~중등이 '안전한 디지털 세상'을 주제로 30초~1분 공익영상을 만드는 마스터 과정입니다. Google Vids의 8초 클립 제약을 활용해, 8초 컷 4~6개를 스토리보드로 설계하고 자막·음악으로 완성합니다.",
-    flow:["도입: 공익광고 사례 감상, 메시지 정하기 (10분)","STEP 1~2: 주제·핵심 메시지·기승전결 스토리 (15분)","STEP 3: 컷별 스토리보드 & 프롬프트 작성 (25분)","STEP 4~5: 클립 생성·편집·자막·발표 (40분+)"],
-    tips:["한 컷(8초)에는 한 장면만 담게 하세요. 욕심내면 결과가 흐려집니다.","무섭거나 폭력적인 장면은 '슬픈 표정', '혼자 있는 모습'처럼 부드럽게 표현하도록 지도하세요.","Vids·Flow 무료 영상 생성은 보통 만 18세 이상 계정 기준이라, 선생님 계정으로 시연·생성하는 것이 안전합니다."],
+    overview:"초6~중등이 '안전한 디지털 세상'을 주제로 30초 공익영상을 만드는 마스터 과정입니다. 에듀핏ai의 5초 클립을 활용해, 5초 컷 6개를 스토리보드로 설계하고 캡컷에서 자막·음악으로 완성합니다. 에듀핏톡 단체방 「U3M9XE」에 학생들을 초대해 함께 작업하며, 5초 영상 기준 최대 30개까지 만들어 저장할 수 있습니다.",
+    flow:["도입: 공익광고 사례 감상, 메시지 정하기 (10분)","STEP 1~2: 주제·핵심 메시지·기승전결 스토리 (15분)","STEP 3: 5초 컷 6개 스토리보드 & 프롬프트 작성 (25분)","STEP 4~5: 에듀핏ai로 클립 생성 → 캡컷 편집·자막·발표 (40분+)"],
+    tips:["에듀핏톡 단체방 「U3M9XE」에 학생들을 먼저 초대해 두세요.","한 컷(5초)에는 한 장면만 담게 하세요. 욕심내면 결과가 흐려집니다.","무섭거나 폭력적인 장면은 '슬픈 표정', '혼자 있는 모습'처럼 부드럽게 표현하도록 지도하세요.","5초 영상은 최대 30개까지 저장되니, 모둠별로 컷을 나눠 만들면 효율적입니다."],
     examples:[
       {q:"기승전결 예시 (악성 댓글)", a:"시작: 한 학생이 댓글을 읽고 표정이 어두워진다 / 전개: 댓글이 쌓여간다 / 전환: 누군가 따뜻한 댓글을 단다 / 마무리: '댓글 한 줄, 응원이 됩니다' 자막"},
       {q:"컷 프롬프트 예시", a:"교실에서 혼자 휴대폰을 보며 슬픈 표정을 짓는 중학생, 창밖 흐린 하늘, 차분하고 쓸쓸한 분위기, 부드러운 실사풍 영상"}
@@ -490,6 +508,27 @@ const CLOUD = {
     const ref=this.storage.ref().child(path);
     await ref.put(file);
     return await ref.getDownloadURL();
+  },
+  // 학생 PDF 제출: Storage에 PDF 올리고, submissions 컬렉션에 기록(파일명·학생·시간·URL)
+  async uploadPDF(meta, blob){
+    if(!this.ready || !this.storage) return null;
+    const subId = `${meta.sk}__${meta.wsId}`;                 // 학생+활동지 1개 = 항상 최신본 1개로 덮어씀
+    const path  = `submissions/${subId}.pdf`;
+    const ref   = this.storage.ref().child(path);
+    await ref.put(blob, {contentType:"application/pdf"});
+    const url   = await ref.getDownloadURL();
+    const rec   = {
+      sk:meta.sk, wsId:meta.wsId, wsTitle:meta.wsTitle, wsTheme:meta.wsTheme,
+      studentName:meta.studentName, birth:meta.birth,
+      fileName:meta.fileName, url, updatedAt:Date.now()
+    };
+    await this.db.collection("submissions").doc(subId).set(rec);
+    return url;
+  },
+  async listSubmissions(){
+    if(!this.ready) return [];
+    const snap=await this.db.collection("submissions").orderBy("updatedAt","desc").get();
+    const out=[]; snap.forEach(d=>out.push(d.data())); return out;
   }
 };
 
@@ -581,6 +620,7 @@ function render(){
   if(!USER){ renderLogin(); return; }
   const hash = location.hash || "#home";
   if(hash.startsWith("#ws/")){ renderWorksheet(hash.slice(4)); }
+  else if(hash.startsWith("#submissions")){ renderSubmissions(); }
   else if(hash.startsWith("#teacher")){ renderTeacher(); }
   else { renderHome(); }
   window.scrollTo(0,0);
@@ -599,6 +639,7 @@ function topbar(){
     </a>
     <div class="spacer"></div>
     ${cloud}
+    ${isT?`<a class="btn ghost sm" href="#submissions">📥 제출물</a>`:``}
     ${isT?`<a class="btn ghost sm" href="#teacher">📘 수업자료</a>`:``}
     <div class="who"><span class="avatar">${esc(initials(USER.name))}</span>
       <span class="nm">${esc(USER.name)} ${isT?'선생님':''}</span></div>
@@ -815,6 +856,8 @@ function renderWorksheet(wsId){
       <a class="btn ghost sm no-print" href="#home">← 목록</a>
     </div>
 
+    ${ws.notice?`<div class="ws-notice">📣 ${esc(ws.notice)}</div>`:''}
+
     <div id="wsCapture">${stepsHtml}</div>
 
     <div class="step">
@@ -829,6 +872,7 @@ function renderWorksheet(wsId){
 
     <div class="savebar no-print">
       <span class="status">마지막 저장: <b id="savedAt">${fmtDate(work.updatedAt)}</b></span>
+      ${(CLOUD.ready && CLOUD.storage && USER.role==="student")?`<span class="status" style="margin-left:14px">📤 PDF 제출: <b id="pdfStatus" style="color:var(--teal)">대기 중</b></span>`:''}
       <div class="spacer"></div>
       <button class="btn ghost sm" onclick="exportPDF()">⬇️ PDF로 저장</button>
       <button class="btn" onclick="saveWork(true)">💾 저장하기</button>
@@ -958,11 +1002,16 @@ window.toggleCheckItem=toggleCheckItem;
 
 /* autosave (debounced) */
 let saveTimer=null;
-function scheduleSave(){ clearTimeout(saveTimer); saveTimer=setTimeout(()=>saveWork(false), 800); }
+function scheduleSave(){
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>saveWork(false), 800);
+  const el=$("#pdfStatus"); if(el && CLOUD.ready && CLOUD.storage && USER.role==="student") el.textContent="잠시 후 제출 갱신…";
+  schedulePDFUpload();
+}
 function saveWork(manual){
   DB.saveWork(USER, CUR.wsId, CUR.work);
   const el=$("#savedAt"); if(el) el.textContent=fmtDate(CUR.work.updatedAt);
-  if(manual) toast("저장했어요 ✓");
+  if(manual){ toast("저장했어요 ✓"); autoUploadPDF(); }
 }
 window.saveWork=saveWork;
 
@@ -1139,41 +1188,79 @@ window.openModal=openModal; window.closeModal=closeModal;
 $("#modalBg").addEventListener("click",e=>{ if(e.target.id==="modalBg") closeModal(); });
 
 /* ============================================================
-   PDF 내보내기  (활동지 입력 내용 → PDF)
+   PDF 만들기  (활동지 입력 내용 → PDF)
+   - buildPDF(): jsPDF 문서 생성 (다운로드/업로드 공용)
+   - exportPDF(): 기기로 다운로드
+   - autoUploadPDF(): 클라우드 Storage에 조용히 업로드 (선생님 화면용)
    ============================================================ */
+async function buildPDF(){
+  const node=$("#wsCapture"); if(!node) return null;
+  const canvas=await html2canvas(node,{scale:2, backgroundColor:"#ffffff", useCORS:true});
+  const {jsPDF}=window.jspdf;
+  const pdf=new jsPDF("p","mm","a4");
+  const pw=210, ph=297, margin=8;
+  const iw=pw-margin*2;
+  const ih=canvas.height*iw/canvas.width;
+  const img=canvas.toDataURL("image/jpeg",.92);
+  pdf.setFillColor(74,47,168); pdf.rect(0,0,pw,4,"F");
+  if(ih<=ph-margin*2){
+    pdf.addImage(img,"JPEG",margin,margin,iw,ih);
+  }else{
+    const pageH=ph-margin*2;
+    const ratio=canvas.width/iw;
+    let sY=0;
+    while(sY<canvas.height){
+      const sliceH=Math.min(pageH*ratio, canvas.height-sY);
+      const c2=document.createElement("canvas"); c2.width=canvas.width; c2.height=sliceH;
+      c2.getContext("2d").drawImage(canvas,0,sY,canvas.width,sliceH,0,0,canvas.width,sliceH);
+      if(sY>0) pdf.addPage();
+      pdf.addImage(c2.toDataURL("image/jpeg",.92),"JPEG",margin,margin,iw,sliceH/ratio);
+      sY+=sliceH;
+    }
+  }
+  const fileName=`${USER.name}_${CUR.ws.title}_${CUR.ws.theme}`.replace(/[\\/:*?"<>|\s]/g,"_")+".pdf";
+  return {pdf, fileName};
+}
+
 async function exportPDF(){
-  const node=$("#wsCapture"); if(!node)return;
+  if(!$("#wsCapture"))return;
   toast("PDF 만드는 중…");
   try{
-    const canvas=await html2canvas(node,{scale:2, backgroundColor:"#ffffff", useCORS:true});
-    const {jsPDF}=window.jspdf;
-    const pdf=new jsPDF("p","mm","a4");
-    const pw=210, ph=297, margin=8;
-    const iw=pw-margin*2;
-    const ih=canvas.height*iw/canvas.width;
-    const img=canvas.toDataURL("image/jpeg",.92);
-    pdf.setFillColor(74,47,168); pdf.rect(0,0,pw,4,"F");
-    if(ih<=ph-margin*2){
-      pdf.addImage(img,"JPEG",margin,margin,iw,ih);
-    }else{
-      const pageH=ph-margin*2;
-      const ratio=canvas.width/iw;
-      let sY=0;
-      while(sY<canvas.height){
-        const sliceH=Math.min(pageH*ratio, canvas.height-sY);
-        const c2=document.createElement("canvas"); c2.width=canvas.width; c2.height=sliceH;
-        c2.getContext("2d").drawImage(canvas,0,sY,canvas.width,sliceH,0,0,canvas.width,sliceH);
-        if(sY>0) pdf.addPage();
-        pdf.addImage(c2.toDataURL("image/jpeg",.92),"JPEG",margin,margin,iw,sliceH/ratio);
-        sY+=sliceH;
-      }
-    }
-    const fn=`${USER.name}_${CUR.ws.title}_${CUR.ws.theme}`.replace(/[\\/:*?"<>|\s]/g,"_");
-    pdf.save(fn+".pdf");
+    const r=await buildPDF(); if(!r)return;
+    r.pdf.save(r.fileName);
     toast("PDF로 저장했어요 ✓");
+    autoUploadPDF(); // 다운로드할 때 클라우드에도 최신본 반영
   }catch(e){ console.error(e); toast("PDF 저장에 실패했어요"); }
 }
 window.exportPDF=exportPDF;
+
+/* 자동 업로드: 입력이 멈춘 뒤 한 번만 조용히 PDF를 클라우드에 올림 */
+let pdfTimer=null, pdfBusy=false, pdfLastAt=0;
+function schedulePDFUpload(){
+  if(!CLOUD.ready || !CLOUD.storage) return;       // 클라우드 미연결이면 자동 PDF 생략
+  if(USER.role!=="student") return;                // 학생 작업만 제출로 기록
+  clearTimeout(pdfTimer);
+  pdfTimer=setTimeout(()=>autoUploadPDF(), 8000);  // 마지막 입력 8초 뒤
+}
+async function autoUploadPDF(){
+  if(!CLOUD.ready || !CLOUD.storage || !CUR || USER.role!=="student") return;
+  if(pdfBusy) return;
+  if(Date.now()-pdfLastAt < 15000) return;          // 최소 15초 간격 (과도한 생성 방지)
+  pdfBusy=true;
+  try{
+    const r=await buildPDF(); if(!r){ pdfBusy=false; return; }
+    const blob=r.pdf.output("blob");
+    await CLOUD.uploadPDF({
+      sk:DB.studentKey(USER), wsId:CUR.wsId,
+      wsTitle:CUR.ws.title, wsTheme:CUR.ws.theme,
+      studentName:USER.name, birth:USER.birth, fileName:r.fileName
+    }, blob);
+    pdfLastAt=Date.now();
+    const el=$("#pdfStatus"); if(el){ el.textContent="제출됨 ✓"; }
+  }catch(e){ console.error("PDF 자동 업로드 실패:",e); }
+  pdfBusy=false;
+}
+window.autoUploadPDF=autoUploadPDF;
 
 /* ============================================================
    TEACHER  (수업 설명 자료 + 예시문)
@@ -1223,6 +1310,80 @@ function renderTeacher(){
   </div>`;
   window.tSel=(id)=>paint(id);
   paint(active);
+}
+
+/* ============================================================
+   TEACHER · 제출물 모아보기 (전체 + 활동지별 탭)
+   ============================================================ */
+let SUBS_CACHE=null, SUBS_FILTER="all";
+async function renderSubmissions(){
+  if(USER.role!=="teacher"){ location.hash="#home"; return; }
+
+  ROOT.innerHTML = topbar() + `<div class="app">
+    <div class="page-head">
+      <div class="eyebrow">TEACHER · 학생 제출물</div>
+      <h2>학생 제출물 모아보기 📥</h2>
+      <p>학생들이 작성한 활동지가 PDF로 자동 제출돼요. 파일명을 누르면 새 창에서 열립니다.</p>
+    </div>
+    <div class="tabs" id="subTabs">
+      <button class="tab on" data-f="all" onclick="subFilter('all')">📚 전체</button>
+      ${Object.values(WORKSHEETS).map(ws=>`<button class="tab" data-f="${ws.id}" onclick="subFilter('${ws.id}')">${ws.emoji} ${esc(ws.grade)}</button>`).join("")}
+      <div class="spacer" style="flex:1"></div>
+      <button class="btn ghost sm" onclick="reloadSubs()">↻ 새로고침</button>
+    </div>
+    <div id="subBody"></div>
+  </div>`;
+
+  if(!CLOUD.ready){
+    $("#subBody").innerHTML=`<div class="empty"><div class="ic">☁️</div>
+      <p>제출물 모아보기는 <b>클라우드 연결</b>이 필요해요.<br>위쪽 배지에서 Firebase를 연결해 주세요.</p></div>`;
+    return;
+  }
+  $("#subBody").innerHTML=`<div class="empty"><div class="ic">⏳</div><p>제출물을 불러오는 중…</p></div>`;
+  try{
+    SUBS_CACHE = await CLOUD.listSubmissions();
+    paintSubs();
+  }catch(e){
+    console.error(e);
+    $("#subBody").innerHTML=`<div class="empty"><div class="ic">⚠️</div><p>불러오지 못했어요. 새로고침을 눌러 주세요.</p></div>`;
+  }
+}
+function subFilter(f){ SUBS_FILTER=f; $$("#subTabs .tab").forEach(t=>t.classList.toggle("on",t.dataset.f===f)); paintSubs(); }
+window.subFilter=subFilter;
+async function reloadSubs(){
+  if(!CLOUD.ready)return;
+  $("#subBody").innerHTML=`<div class="empty"><div class="ic">⏳</div><p>새로고침 중…</p></div>`;
+  try{ SUBS_CACHE=await CLOUD.listSubmissions(); paintSubs(); }catch(e){ toast("새로고침 실패"); }
+}
+window.reloadSubs=reloadSubs;
+
+function paintSubs(){
+  const body=$("#subBody"); if(!body)return;
+  let list=SUBS_CACHE||[];
+  if(SUBS_FILTER!=="all") list=list.filter(s=>s.wsId===SUBS_FILTER);
+  if(!list.length){
+    body.innerHTML=`<div class="empty"><div class="ic">📭</div><p>아직 제출된 활동지가 없어요.</p></div>`;
+    return;
+  }
+  const rows=list.map(s=>{
+    const ws=WORKSHEETS[s.wsId];
+    const emoji=ws?ws.emoji:"📄";
+    return `<a class="sub-row" href="${s.url}" target="_blank" rel="noopener">
+      <span class="sub-ic">${emoji}</span>
+      <span class="sub-main">
+        <span class="sub-name">${esc(s.studentName||'이름없음')}</span>
+        <span class="sub-file">${esc(s.fileName||'활동지.pdf')}</span>
+      </span>
+      <span class="sub-meta">
+        <span class="sub-ws">${esc(s.wsTitle||'')} · ${esc(s.wsTheme||'')}</span>
+        <span class="sub-time">${fmtDate(s.updatedAt)}</span>
+      </span>
+      <span class="sub-open">PDF 열기 →</span>
+    </a>`;
+  }).join("");
+  body.innerHTML=`<div class="sub-list">
+    <div class="sub-count">총 <b>${list.length}</b>개 제출물</div>
+    ${rows}</div>`;
 }
 
 /* ---------------- boot ---------------- */
