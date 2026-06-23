@@ -164,6 +164,11 @@ textarea.in{
 input.in{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;font-size:15px;background:var(--lav);transition:.15s}
 textarea.in:focus,input.in:focus{outline:none;border-color:var(--purple);background:#fff;box-shadow:0 0 0 4px rgba(108,79,214,.10)}
 .formula{background:var(--lav);border:1.5px dashed var(--purple);border-radius:12px;padding:12px 14px;font-size:14px;color:var(--ink);margin-bottom:12px}
+.summary-box{background:linear-gradient(135deg,#f3eefe,#eafaf7);border:1.5px solid var(--purple-lt);border-radius:14px;padding:16px;margin-top:6px}
+.summary-text{font-family:'Noto Sans KR',sans-serif;font-size:15px;line-height:1.7;color:var(--ink);white-space:pre-wrap;word-break:break-word;margin:0 0 12px}
+.summary-empty{color:var(--gray);font-style:italic;font-size:14px}
+.copy-btn{background:var(--purple);color:#fff;display:inline-flex;align-items:center;gap:5px}
+.copy-btn.copied{background:var(--teal)}
 .formula b{color:var(--purple);font-weight:800}
 
 .checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
@@ -238,7 +243,7 @@ textarea.in:focus,input.in:focus{outline:none;border-color:var(--purple);backgro
 .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;align-items:center}
 .sub-list{display:flex;flex-direction:column;gap:10px}
 .sub-count{font-size:13px;color:var(--gray);font-weight:700;margin-bottom:4px}
-.sub-row{display:flex;align-items:center;gap:14px;background:#fff;border-radius:14px;box-shadow:var(--shadow);padding:14px 18px;text-decoration:none;color:var(--ink);transition:.14s;border:1.5px solid transparent}
+.sub-row{cursor:pointer;display:flex;align-items:center;gap:14px;background:#fff;border-radius:14px;box-shadow:var(--shadow);padding:14px 18px;text-decoration:none;color:var(--ink);transition:.14s;border:1.5px solid transparent}
 .sub-row:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);border-color:var(--purple-lt)}
 .sub-ic{font-size:26px;flex:none}
 .sub-main{display:flex;flex-direction:column;min-width:0;flex:1}
@@ -327,7 +332,11 @@ const WORKSHEETS = {
        ]},
       {id:"s3", n:"STEP 3", t:"한 문장으로 이어 붙여서 프롬프트 완성하기",
        formula:"[어디]에서 [누가]가 [무엇]을 하는 [그림 느낌] 그림을 그려줘.",
-       fields:[{type:"textarea", id:"sentence", label:"내가 만든 문장", rows:3}]},
+       fields:[
+         {type:"textarea", id:"sentence", label:"내가 만든 문장", rows:3},
+         {type:"summary", id:"prompt", label:"✨ 지금까지 쓴 내용으로 만든 프롬프트",
+          build:"posterLow"}
+       ]},
       {id:"s4", n:"STEP 4", t:"AI 그림 보고 생각하기",
        fields:[
          {type:"checks", id:"satisfied", label:"내가 원한 대로 잘 나왔나요?", multi:false,
@@ -371,7 +380,9 @@ const WORKSHEETS = {
       {id:"s4", n:"STEP 4", t:"프롬프트 문장 완성하기",
        formula:"[배경]에서 [주인공]이 [행동]을 하는, [색감·분위기]의 [그림 스타일] 포스터를 만들어줘.",
        fields:[
-         {type:"textarea", id:"ko", label:"내가 쓴 프롬프트", rows:3}
+         {type:"textarea", id:"ko", label:"내가 쓴 프롬프트", rows:3},
+         {type:"summary", id:"prompt", label:"✨ 지금까지 쓴 내용으로 만든 프롬프트",
+          build:"posterHigh"}
        ]},
       {id:"s5", n:"STEP 5", t:"결과 분석하기",
        fields:[
@@ -411,7 +422,9 @@ const WORKSHEETS = {
          {type:"textarea", id:"start", label:"① 시작 (문제 상황 보여주기)"},
          {type:"textarea", id:"mid", label:"② 전개 (어떤 일이 벌어지나)"},
          {type:"textarea", id:"turn", label:"③ 전환 (해결·깨달음)"},
-         {type:"textarea", id:"end", label:"④ 마무리 (핵심 메시지·행동 제안)"}
+         {type:"textarea", id:"end", label:"④ 마무리 (핵심 메시지·행동 제안)"},
+         {type:"summary", id:"summary", label:"✨ 지금까지 쓴 내용 모아보기",
+          build:"video"}
        ]},
       {id:"s3", n:"STEP 3", t:"장면별 스토리보드 & 프롬프트",
        hint:"컷마다 장면·프롬프트·자막을 적어요. 5초 컷 6개로 30초를 채워요. 프롬프트는 [누가/무엇] + [어디서] + [어떤 행동·분위기] + [영상 스타일] 순서로!",
@@ -509,21 +522,28 @@ const CLOUD = {
     await ref.put(file);
     return await ref.getDownloadURL();
   },
-  // 학생 PDF 제출: Storage에 PDF 올리고, submissions 컬렉션에 기록(파일명·학생·시간·URL)
-  async uploadPDF(meta, blob){
-    if(!this.ready || !this.storage) return null;
-    const subId = `${meta.sk}__${meta.wsId}`;                 // 학생+활동지 1개 = 항상 최신본 1개로 덮어씀
-    const path  = `submissions/${subId}.pdf`;
-    const ref   = this.storage.ref().child(path);
-    await ref.put(blob, {contentType:"application/pdf"});
-    const url   = await ref.getDownloadURL();
-    const rec   = {
+  // 학생 PDF 제출: Storage가 있으면 Storage에, 없으면(무료 요금제) Firestore에 직접 저장
+  async uploadPDF(meta, blob, dataUrl){
+    if(!this.ready) return null;
+    const subId = `${meta.sk}__${meta.wsId}`;     // 학생+활동지 1개 = 항상 최신본 1개로 덮어씀
+    const rec = {
       sk:meta.sk, wsId:meta.wsId, wsTitle:meta.wsTitle, wsTheme:meta.wsTheme,
       studentName:meta.studentName, birth:meta.birth,
-      fileName:meta.fileName, url, updatedAt:Date.now()
+      fileName:meta.fileName, updatedAt:Date.now()
     };
+    if(this.storage){
+      // 유료(Blaze): Storage에 올리고 URL만 기록
+      const ref=this.storage.ref().child(`submissions/${subId}.pdf`);
+      await ref.put(blob, {contentType:"application/pdf"});
+      rec.url = await ref.getDownloadURL();
+      rec.store = "storage";
+    }else{
+      // 무료(Spark): Storage가 없으므로 PDF 데이터를 Firestore 문서에 직접 저장
+      rec.dataUrl = dataUrl;     // "data:application/pdf;base64,...."
+      rec.store = "firestore";
+    }
     await this.db.collection("submissions").doc(subId).set(rec);
-    return url;
+    return rec.url || "firestore";
   },
   async listSubmissions(){
     if(!this.ready) return [];
@@ -766,7 +786,7 @@ function progressOf(wsId){
   const ws=WORKSHEETS[wsId]; const work=DB.getWork(USER, wsId);
   let total=0, done=0;
   ws.steps.forEach(st=> st.fields.forEach(f=>{
-    if(f.type==="storyboard"||f.type==="checklist") return; // optional-ish
+    if(f.type==="storyboard"||f.type==="checklist"||f.type==="summary") return; // 자동/선택 항목 제외
     total++;
     const v=work.answers[st.id+"."+f.id];
     if(f.type==="checks"){ if(v && ((Array.isArray(v)&&v.length)|| (!Array.isArray(v)&&v!=null && v!=="" ))) done++; }
@@ -872,7 +892,7 @@ function renderWorksheet(wsId){
 
     <div class="savebar no-print">
       <span class="status">마지막 저장: <b id="savedAt">${fmtDate(work.updatedAt)}</b></span>
-      ${(CLOUD.ready && CLOUD.storage && USER.role==="student")?`<span class="status" style="margin-left:14px">📤 PDF 제출: <b id="pdfStatus" style="color:var(--teal)">대기 중</b></span>`:''}
+      ${(CLOUD.ready && USER.role==="student")?`<span class="status" style="margin-left:14px">📤 PDF 제출: <b id="pdfStatus" style="color:var(--teal)">대기 중</b></span>`:''}
       <div class="spacer"></div>
       <button class="btn ghost sm" onclick="exportPDF()">⬇️ PDF로 저장</button>
       <button class="btn" onclick="saveWork(true)">💾 저장하기</button>
@@ -885,7 +905,7 @@ function renderWorksheet(wsId){
 }
 
 function fieldVal(stId,fId){ return CUR.work.answers[stId+"."+fId]; }
-function setVal(stId,fId,v){ CUR.work.answers[stId+"."+fId]=v; scheduleSave(); }
+function setVal(stId,fId,v){ CUR.work.answers[stId+"."+fId]=v; scheduleSave(); refreshSummaries(); }
 
 function renderStep(ws, st, work){
   const fields = st.fields.map(f=>renderField(st, f)).join("");
@@ -956,10 +976,96 @@ function renderField(st, f){
     }).join("");
     return `<div style="display:grid;gap:0">${items}</div>`;
   }
+  if(f.type==="summary"){
+    const text=buildSummary(f.build);
+    return `<div class="lab">${esc(f.label||'')}</div>
+      <div class="summary-box" data-build="${f.build}">
+        <pre class="summary-text" id="sum_${st.id}_${f.id}">${esc(text)||'<span class=\"summary-empty\">앞 단계를 채우면 여기에 자동으로 모여요.</span>'}</pre>
+        <button class="btn sm copy-btn" type="button" onclick="copySummary('sum_${st.id}_${f.id}', this)">📋 복사하기</button>
+      </div>`;
+  }
   return "";
 }
 
-/* field bindings */
+/* 앞 단계 답을 모아 프롬프트/요약 텍스트 생성 */
+function ans(stId, fId){ const v=fieldVal(stId,fId); return v; }
+function joinChecks(v){ return Array.isArray(v)?v.filter(Boolean).join(", "):(v||""); }
+/* 마지막 글자 받침 여부로 조사 선택 (이/가, 은/는 등) */
+function josa(word, withBat, noBat){
+  if(!word) return noBat;
+  const c=word[word.length-1].charCodeAt(0);
+  if(c<0xAC00||c>0xD7A3) return noBat;       // 한글이 아니면 받침 없음 취급
+  return ((c-0xAC00)%28)!==0 ? withBat : noBat;
+}
+function buildSummary(kind){
+  if(kind==="posterLow"){
+    const who=ans("s2","who")||"", where=ans("s2","where")||"", what=ans("s2","what")||"";
+    const style=joinChecks(ans("s2","style"));
+    let parts=[];
+    if(where) parts.push(where+"에서");
+    if(who) parts.push(who + josa(who,"이","가"));
+    if(what) parts.push(what);
+    let line = parts.join(" ").trim();
+    if(style) line += (line?", ":"") + style+" 그림으로";
+    if(line) line += " 그려줘.";
+    return line;
+  }
+  if(kind==="posterHigh"){
+    const m=ans("s3","matrix")||{};
+    const subj=m[0]||"", bg=m[1]||"", mood=m[2]||"", style=m[3]||"";
+    let parts=[];
+    if(bg) parts.push(bg+"에서");
+    if(subj) parts.push(subj + josa(subj,"이","가"));
+    if(mood) parts.push(mood+" 분위기의");
+    if(style) parts.push(style+" 스타일");
+    let line=parts.join(" ").trim();
+    if(line) line += " 포스터를 만들어줘.";
+    return line;
+  }
+  if(kind==="video"){
+    const topic=joinChecks(ans("s1","topic"));
+    const msg=ans("s1","message")||"";
+    const a=ans("s2","start")||"", b=ans("s2","mid")||"", c=ans("s2","turn")||"", d=ans("s2","end")||"";
+    let lines=[];
+    if(topic) lines.push("[주제] "+topic);
+    if(msg) lines.push("[핵심 메시지] "+msg);
+    if(a) lines.push("① 시작: "+a);
+    if(b) lines.push("② 전개: "+b);
+    if(c) lines.push("③ 전환: "+c);
+    if(d) lines.push("④ 마무리: "+d);
+    return lines.join("\n");
+  }
+  return "";
+}
+
+/* 입력 변경 시 화면의 summary 박스를 실시간 갱신 */
+function refreshSummaries(){
+  $$(".summary-box").forEach(box=>{
+    const kind=box.dataset.build;
+    const pre=box.querySelector(".summary-text");
+    const text=buildSummary(kind);
+    pre.textContent = text || "";
+    if(!text){ pre.innerHTML='<span class="summary-empty">앞 단계를 채우면 여기에 자동으로 모여요.</span>'; }
+  });
+}
+
+/* 복사 버튼 */
+function copySummary(preId, btn){
+  const pre=document.getElementById(preId); if(!pre)return;
+  const text=pre.textContent.trim();
+  if(!text){ toast("아직 복사할 내용이 없어요"); return; }
+  const done=()=>{ const o=btn.textContent; btn.textContent="✓ 복사됨!"; btn.classList.add("copied"); setTimeout(()=>{btn.textContent=o;btn.classList.remove("copied");},1500); };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(()=>fallbackCopy(text,done));
+  }else{ fallbackCopy(text,done); }
+}
+function fallbackCopy(text, done){
+  const ta=document.createElement("textarea"); ta.value=text; ta.style.position="fixed"; ta.style.opacity="0";
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand("copy"); done(); }catch(e){ toast("복사에 실패했어요"); }
+  document.body.removeChild(ta);
+}
+window.copySummary=copySummary;
 function bindFields(){
   $$(".fld").forEach(el=>{
     el.addEventListener("input",()=>{ const [s,f]=el.dataset.k.split("."); setVal(s,f, el.value); });
@@ -1005,7 +1111,7 @@ let saveTimer=null;
 function scheduleSave(){
   clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>saveWork(false), 800);
-  const el=$("#pdfStatus"); if(el && CLOUD.ready && CLOUD.storage && USER.role==="student") el.textContent="잠시 후 제출 갱신…";
+  const el=$("#pdfStatus"); if(el && CLOUD.ready && USER.role==="student") el.textContent="잠시 후 제출 갱신…";
   schedulePDFUpload();
 }
 function saveWork(manual){
@@ -1237,30 +1343,62 @@ window.exportPDF=exportPDF;
 /* 자동 업로드: 입력이 멈춘 뒤 한 번만 조용히 PDF를 클라우드에 올림 */
 let pdfTimer=null, pdfBusy=false, pdfLastAt=0;
 function schedulePDFUpload(){
-  if(!CLOUD.ready || !CLOUD.storage) return;       // 클라우드 미연결이면 자동 PDF 생략
+  if(!CLOUD.ready) return;                          // 클라우드 미연결이면 자동 PDF 생략
   if(USER.role!=="student") return;                // 학생 작업만 제출로 기록
   clearTimeout(pdfTimer);
   pdfTimer=setTimeout(()=>autoUploadPDF(), 8000);  // 마지막 입력 8초 뒤
 }
 async function autoUploadPDF(){
-  if(!CLOUD.ready || !CLOUD.storage || !CUR || USER.role!=="student") return;
+  if(!CLOUD.ready || !CUR || USER.role!=="student") return;
   if(pdfBusy) return;
   if(Date.now()-pdfLastAt < 15000) return;          // 최소 15초 간격 (과도한 생성 방지)
   pdfBusy=true;
   try{
     const r=await buildPDF(); if(!r){ pdfBusy=false; return; }
     const blob=r.pdf.output("blob");
+    let dataUrl=null;
+    if(!CLOUD.storage){
+      // Storage가 없으면(무료 요금제) PDF를 Firestore에 직접 넣어야 하므로 data URL 생성
+      dataUrl = r.pdf.output("datauristring");
+      // Firestore 문서 한도(~1MB) 보호: 너무 크면 더 압축해 재생성
+      if(dataUrl.length > 900000){
+        dataUrl = await buildCompactPDFDataUrl();
+      }
+    }
     await CLOUD.uploadPDF({
       sk:DB.studentKey(USER), wsId:CUR.wsId,
       wsTitle:CUR.ws.title, wsTheme:CUR.ws.theme,
       studentName:USER.name, birth:USER.birth, fileName:r.fileName
-    }, blob);
+    }, blob, dataUrl);
     pdfLastAt=Date.now();
     const el=$("#pdfStatus"); if(el){ el.textContent="제출됨 ✓"; }
-  }catch(e){ console.error("PDF 자동 업로드 실패:",e); }
+  }catch(e){
+    console.error("PDF 자동 업로드 실패:",e);
+    const el=$("#pdfStatus"); if(el){ el.textContent="제출 실패 (다시 시도 중)"; }
+  }
   pdfBusy=false;
 }
 window.autoUploadPDF=autoUploadPDF;
+
+/* Firestore 직접 저장용: 더 강하게 압축한 PDF data URL 생성 */
+async function buildCompactPDFDataUrl(){
+  const node=$("#wsCapture"); if(!node) return null;
+  const canvas=await html2canvas(node,{scale:1.3, backgroundColor:"#ffffff", useCORS:true});
+  const {jsPDF}=window.jspdf;
+  const pdf=new jsPDF("p","mm","a4");
+  const pw=210, ph=297, margin=8, iw=pw-margin*2;
+  const ratio=canvas.width/iw; const pageH=ph-margin*2; let sY=0;
+  pdf.setFillColor(74,47,168); pdf.rect(0,0,pw,4,"F");
+  while(sY<canvas.height){
+    const sliceH=Math.min(pageH*ratio, canvas.height-sY);
+    const c2=document.createElement("canvas"); c2.width=canvas.width; c2.height=sliceH;
+    c2.getContext("2d").drawImage(canvas,0,sY,canvas.width,sliceH,0,0,canvas.width,sliceH);
+    if(sY>0) pdf.addPage();
+    pdf.addImage(c2.toDataURL("image/jpeg",.7),"JPEG",margin,margin,iw,sliceH/ratio);
+    sY+=sliceH;
+  }
+  return pdf.output("datauristring");
+}
 
 /* ============================================================
    TEACHER  (수업 설명 자료 + 예시문)
@@ -1315,7 +1453,7 @@ function renderTeacher(){
 /* ============================================================
    TEACHER · 제출물 모아보기 (전체 + 활동지별 탭)
    ============================================================ */
-let SUBS_CACHE=null, SUBS_FILTER="all";
+let SUBS_CACHE=null, SUBS_VIEW=null, SUBS_FILTER="all";
 async function renderSubmissions(){
   if(USER.role!=="teacher"){ location.hash="#home"; return; }
 
@@ -1365,10 +1503,10 @@ function paintSubs(){
     body.innerHTML=`<div class="empty"><div class="ic">📭</div><p>아직 제출된 활동지가 없어요.</p></div>`;
     return;
   }
-  const rows=list.map(s=>{
+  const rows=list.map((s,idx)=>{
     const ws=WORKSHEETS[s.wsId];
     const emoji=ws?ws.emoji:"📄";
-    return `<a class="sub-row" href="${s.url}" target="_blank" rel="noopener">
+    return `<div class="sub-row" onclick="openSubmission(${idx})">
       <span class="sub-ic">${emoji}</span>
       <span class="sub-main">
         <span class="sub-name">${esc(s.studentName||'이름없음')}</span>
@@ -1379,12 +1517,33 @@ function paintSubs(){
         <span class="sub-time">${fmtDate(s.updatedAt)}</span>
       </span>
       <span class="sub-open">PDF 열기 →</span>
-    </a>`;
+    </div>`;
   }).join("");
   body.innerHTML=`<div class="sub-list">
     <div class="sub-count">총 <b>${list.length}</b>개 제출물</div>
     ${rows}</div>`;
+  // 현재 화면에 그려진 목록을 인덱스로 접근하기 위해 보관
+  SUBS_VIEW = list;
 }
+
+/* 제출물 열기: Storage는 URL, 무료요금제는 Firestore dataUrl → 새 탭에서 PDF */
+function openSubmission(idx){
+  const s = (SUBS_VIEW||[])[idx]; if(!s) return;
+  if(s.url){ window.open(s.url, "_blank", "noopener"); return; }
+  if(s.dataUrl){
+    try{
+      // data URL → Blob → blob URL (브라우저 새 탭에서 안정적으로 열림)
+      const parts=s.dataUrl.split(","); const bin=atob(parts[1]);
+      const arr=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+      const blob=new Blob([arr],{type:"application/pdf"});
+      const burl=URL.createObjectURL(blob);
+      window.open(burl, "_blank", "noopener");
+    }catch(e){ console.error(e); toast("PDF를 여는 데 실패했어요"); }
+    return;
+  }
+  toast("열 수 있는 PDF가 없어요");
+}
+window.openSubmission=openSubmission;
 
 /* ---------------- boot ---------------- */
 (async function boot(){
