@@ -333,7 +333,6 @@ const WORKSHEETS = {
       {id:"s3", n:"STEP 3", t:"한 문장으로 이어 붙여서 프롬프트 완성하기",
        formula:"[어디]에서 [누가]가 [무엇]을 하는 [그림 느낌] 그림을 그려줘.",
        fields:[
-         {type:"textarea", id:"sentence", label:"내가 만든 문장", rows:3},
          {type:"summary", id:"prompt", label:"✨ 지금까지 쓴 내용으로 만든 프롬프트",
           build:"posterLow"}
        ]},
@@ -380,7 +379,6 @@ const WORKSHEETS = {
       {id:"s4", n:"STEP 4", t:"프롬프트 문장 완성하기",
        formula:"[배경]에서 [주인공]이 [행동]을 하는, [색감·분위기]의 [그림 스타일] 포스터를 만들어줘.",
        fields:[
-         {type:"textarea", id:"ko", label:"내가 쓴 프롬프트", rows:3},
          {type:"summary", id:"prompt", label:"✨ 지금까지 쓴 내용으로 만든 프롬프트",
           build:"posterHigh"}
        ]},
@@ -419,10 +417,10 @@ const WORKSHEETS = {
       {id:"s2", n:"STEP 2", t:"스토리 짜기 (기승전결)",
        hint:"이야기의 큰 흐름을 4단계로 잡아요. 다음 단계에서 5초 컷 6개로 나눠 담아요. 문제 → 변화 → 메시지 순서가 좋아요.",
        fields:[
-         {type:"textarea", id:"start", label:"① 시작 (문제 상황 보여주기)"},
-         {type:"textarea", id:"mid", label:"② 전개 (어떤 일이 벌어지나)"},
-         {type:"textarea", id:"turn", label:"③ 전환 (해결·깨달음)"},
-         {type:"textarea", id:"end", label:"④ 마무리 (핵심 메시지·행동 제안)"},
+         {type:"textarea", id:"start", label:"① 시작 (문제 상황 보여주기)", ph:"예: 한 학생이 휴대폰으로 악성 댓글을 읽고 표정이 어두워진다"},
+         {type:"textarea", id:"mid", label:"② 전개 (어떤 일이 벌어지나)", ph:"예: 댓글이 점점 쌓이고, 학생은 더 외로워 보인다"},
+         {type:"textarea", id:"turn", label:"③ 전환 (해결·깨달음)", ph:"예: 한 친구가 따뜻한 응원 댓글을 달아준다"},
+         {type:"textarea", id:"end", label:"④ 마무리 (핵심 메시지·행동 제안)", ph:"예: '댓글 한 줄, 누군가에겐 큰 힘이 됩니다' 문구가 뜬다"},
          {type:"summary", id:"summary", label:"✨ 지금까지 쓴 내용 모아보기",
           build:"video"}
        ]},
@@ -1012,7 +1010,9 @@ function buildSummary(kind){
   }
   if(kind==="posterHigh"){
     const m=ans("s3","matrix")||{};
-    const subj=m[0]||"", bg=m[1]||"", mood=m[2]||"", style=m[3]||"";
+    let subj=(m[0]||"").trim(), bg=(m[1]||"").trim(), mood=(m[2]||"").trim(), style=(m[3]||"").trim();
+    // 배경과 주인공에 같은 내용을 넣은 경우 중복 제거
+    if(bg && bg===subj) bg="";
     let parts=[];
     if(bg) parts.push(bg+"에서");
     if(subj) parts.push(subj + josa(subj,"이","가"));
