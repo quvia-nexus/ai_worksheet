@@ -421,15 +421,15 @@ const WORKSHEETS = {
          {type:"textarea", id:"mid", label:"② 전개 (어떤 일이 벌어지나)", ph:"예: 댓글이 점점 쌓이고, 학생은 더 외로워 보인다"},
          {type:"textarea", id:"turn", label:"③ 전환 (해결·깨달음)", ph:"예: 한 친구가 따뜻한 응원 댓글을 달아준다"},
          {type:"textarea", id:"end", label:"④ 마무리 (핵심 메시지·행동 제안)", ph:"예: '댓글 한 줄, 누군가에겐 큰 힘이 됩니다' 문구가 뜬다"},
-         {type:"summary", id:"summary", label:"✨ 지금까지 쓴 내용 모아보기",
+         {type:"summary", id:"summary", label:"✨ 지금까지 쓴 내용 프롬프트 만들기",
           build:"video"}
        ]},
       {id:"s3", n:"STEP 3", t:"장면별 스토리보드 & 프롬프트",
-       hint:"컷마다 장면·프롬프트·자막을 적어요. 5초 컷 6개로 30초를 채워요. 프롬프트는 [누가/무엇] + [어디서] + [어떤 행동·분위기] + [영상 스타일] 순서로!",
-       fields:[{type:"storyboard", id:"cuts", cuts:[
-         {t:"① 0~5초"},{t:"② 5~10초"},{t:"③ 10~15초"},
-         {t:"④ 15~20초"},{t:"⑤ 20~25초"},{t:"⑥ 25~30초"}
-       ]}]},
+       hint:"STEP 2에서 만든 프롬프트를 AI(챗GPT·제미나이 등)에 붙여넣으면, 5초 단위 스토리보드를 만들어줘요. AI가 만들어준 컷1~컷6 내용을 아래 칸에 그대로 붙여넣으세요.",
+       fields:[{type:"textarea", id:"storyboard",
+         label:"AI가 만들어준 스토리보드 (컷1~컷6)",
+         ph:"예)\n컷1 (0~5초)\n· 장면 설명: 한 학생이 휴대폰으로 악성 댓글을 읽고 표정이 어두워진다\n· AI 프롬프트: 교실에서 혼자 휴대폰을 보며 슬픈 표정을 짓는 중학생, 차분한 분위기, 실사풍 영상\n· 자막/멘트: \"무심코 쓴 댓글…\"\n\n컷2 (5~10초)\n· 장면 설명: ...\n· AI 프롬프트: ...\n· 자막/멘트: ...",
+         rows:16}]},
       {id:"s4", n:"STEP 4", t:"자막 · 음악 · 편집으로 완성",
        hint:"만든 5초 클립 6개를 캡컷에서 순서대로 이어 붙이고, 자막과 배경음악을 넣어요.",
        fields:[{type:"checklist", id:"finish", items:[
@@ -1033,6 +1033,11 @@ function buildSummary(kind){
     if(b) lines.push("② 전개: "+b);
     if(c) lines.push("③ 전환: "+c);
     if(d) lines.push("④ 마무리: "+d);
+    // 내용이 하나라도 있으면 스토리보드 생성 지시문을 마지막에 덧붙임
+    if(lines.length){
+      lines.push("");
+      lines.push("위 내용을 바탕으로 30초 분량의 공익영상 스토리보드를 5초 단위(컷1~컷6, 총 6컷)로 만들어줘. 각 컷마다 ① 장면 설명, ② AI 영상 프롬프트, ③ 자막/멘트 세 가지로 구분해서 적어줘.");
+    }
     return lines.join("\n");
   }
   return "";
