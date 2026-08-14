@@ -1365,6 +1365,70 @@ function asText(v){
 /* 문장 끝에 마침표가 없으면 붙임 */
 function endDot(s){ s=(s||"").trim(); if(!s) return ""; return /[.!?。…]$/.test(s)?s:s+"."; }
 
+/* ---- 문장 자연화 유틸 ---- */
+/* 끝의 마침표/따옴표 제거 */
+function stripEndPunct(s){ return (s||"").trim().replace(/["'”’]/g,"").replace(/[.。]+$/,"").trim(); }
+
+/* 한글 한 글자의 종성(받침) 자모를 반환 (받침 없으면 "") */
+function decomposeLast(ch){
+  if(!ch) return "";
+  const code=ch.charCodeAt(0);
+  if(code<0xAC00||code>0xD7A3) return "";
+  const jong=(code-0xAC00)%28;
+  const table=["","ㄱ","ㄲ","ㄳ","ㄴ","ㄵ","ㄶ","ㄷ","ㄹ","ㄺ","ㄻ","ㄼ","ㄽ","ㄾ","ㄿ","ㅀ","ㅁ","ㅂ","ㅄ","ㅅ","ㅆ","ㅇ","ㅈ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
+  return table[jong]||"";
+}
+
+/* 어미 유형 판별 */
+function endsDeclarative(s){ // "~있다/한다/된다/같다" 등 종결형
+  return /(다|요|음|임|까|네|죠|군요|습니다|어요|아요)$/.test(stripEndPunct(s));
+}
+function endsNounPhrase(s){ // 명사/부사구로 끝남 (동사·형용사 어미 없음)
+  const t=stripEndPunct(s);
+  return !/(다|요|음|임|까|네|죠|한|하는|인|던|은|는|을|를|로|게|히|이|가|과|와)$/.test(t);
+}
+function endsAdnominal(s){ // 관형형 "~하는/~한/~던/~주는"
+  return /(하는|한|던|는|운|은|린|긴|낀|주는|있는|없는)$/.test(stripEndPunct(s));
+}
+
+/* 개선 내용을 자연스러운 문장으로:
+   - 종결형("~바꿨다")     → "…처음 결과를 보고 슬로건 색을 푸른 계열로 바꾸었습니다"
+   - 명사구("건물을 더 많이") → "…건물을 더 많이 넣는 방향으로 다듬었습니다"
+   - 관형/기타            → "…OO를 개선했습니다" */
+function sentImprove(raw){
+  const s=stripEndPunct(raw);
+  // 부사/미완결형("더 많이", "크게", "밝게")으로 끝나면 행위 보충
+  if(/(많이|적게|크게|작게|길게|짧게|밝게|어둡게|진하게|연하게|더)$/.test(s)){
+    return `처음 만든 결과를 본 뒤, ${s} 넣는 방향으로 다듬었습니다`;
+  }
+  if(endsDeclarative(s)){
+    // 이미 과거형(받침 ㅆ + 다: 했다/바꿨다/갔다 등)이면 "…습니다"로 정중화
+    if(/([가-힣])다$/.test(s) && /ㅆ/.test(decomposeLast(s.slice(-2,-1)))){
+      return `처음 만든 결과를 본 뒤, ${s.replace(/다$/,"습니다")}`;
+    }
+    if(/(었다|았다|였다|했다)$/.test(s)){
+      return `처음 만든 결과를 본 뒤, ${s.replace(/다$/,"습니다")}`;
+    }
+    return `처음 만든 결과를 본 뒤, ${s.replace(/다$/,"")}었습니다`.replace(/었었습니다$/,"었습니다");
+  }
+  if(endsNounPhrase(s)){
+    return `처음 만든 결과를 본 뒤, ${s} 넣는 방향으로 다듬었습니다`;
+  }
+  return `처음 만든 결과를 본 뒤, ${s} 부분을 개선했습니다`;
+}
+
+/* itv2(달라진 점) 문장화 */
+function sentChange(raw){
+  const s=stripEndPunct(raw);
+  if(endsDeclarative(s)){
+    if(/(었다|았다|였다|했다|됐다|졌다)$/.test(s)){
+      return `프롬프트를 다듬으면서 ${s.replace(/다$/,"습니다")}`;
+    }
+    return `프롬프트를 다듬으면서 ${s.replace(/다$/,"")}는 변화를 느꼈습니다`;
+  }
+  return `프롬프트를 다듬으면서 ${s}${josa(s,"이","가")} 달라졌습니다`;
+}
+
 /* 프롬프트 4요소(matrix) → 자연스러운 한 문단으로 엮기 */
 function proseFromMatrix(m, fallbackPromptText){
   if(!m || typeof m!=="object"){
@@ -1377,17 +1441,22 @@ function proseFromMatrix(m, fallbackPromptText){
   if(subj) sent.push(`이 포스터는 ${subj}${josa(subj,"을","를")} 주인공으로 삼았습니다`);
   if(bg)   sent.push(`배경에는 ${bg}${josa(bg,"을","를")} 배치했습니다`);
   if(mood){
-    // "전체적으로 차가운 남색…" → "차가운 남색… 색감으로" 자연화
-    let mm=mood.replace(/^전체적으로\s*/,"").replace(/\s*(색감|분위기)$/,"");
-    sent.push(`${mm} 색감으로 분위기를 살렸습니다`);
+    let mm=mood.replace(/^전체적으로\s*/,"").replace(/\s*(색감|분위기)$/,"").trim();
+    // 실제 '색' 언급이 있으면 '색감으로', 관형형이거나 색이 아니면 '분위기로'
+    const hasColor=/(색|남색|청색|파랑|빨강|노랑|초록|보라|주황|회색|흰|검|톤|계열)/.test(mm);
+    if(endsAdnominal(mm) || !hasColor){
+      sent.push(`${mm} 분위기로 표현했습니다`);
+    }else{
+      sent.push(`${mm} 색감으로 분위기를 살렸습니다`);
+    }
   }
   if(style){
     // "…사실적으로 표현한" 같은 서술형은 그대로, 명사형이면 "스타일로" 부착
     let ss=style.replace(/\s*스타일$/,"").trim();
     if(/(한|하는|된|표현한|그린|담은)$/.test(ss)){
-      sent.push(`${ss} 화풍으로 완성하고자 했습니다`);
+      sent.push(`${ss} 화풍으로 완성했습니다`);
     }else{
-      sent.push(`${ss} 스타일로 표현하고자 했습니다`);
+      sent.push(`${ss} 스타일로 담아냈습니다`);
     }
   }
   return sent.map(endDot).join(" ").trim();
@@ -1400,7 +1469,18 @@ function proseFromLow(work){
   const sent=[];
   if(who) sent.push(`이 그림의 주인공은 ${who}입니다`);
   if(where) sent.push(`${where}${josa(where,"을","를")} 배경으로 삼았습니다`);
-  if(what) sent.push(`${what} 모습을 담았습니다`);
+  if(what){
+    let w=stripEndPunct(what);
+    // "깃발을 꽂고 있다" 같은 종결형 → 관형형으로: "있다"→"있는", 그 외 "~다"→"~는"
+    if(endsDeclarative(w)){
+      if(/있다$/.test(w)) w=w.replace(/있다$/,"있는");
+      else if(/하다$/.test(w)) w=w.replace(/하다$/,"하는");
+      else if(/다$/.test(w)) w=w.replace(/다$/,"는");
+      sent.push(`${w} 모습을 담았습니다`);
+    }else{
+      sent.push(`${w} 모습을 담았습니다`);
+    }
+  }
   if(style) sent.push(`${style} 느낌으로 표현하고자 했습니다`);
   return sent.map(endDot).join(" ").trim();
 }
@@ -1432,9 +1512,9 @@ function extractProposal(ws, work){
   const itv1=asText(wval(work,"s7","itv1"))||asText(wval(work,"s5","best"));
   const itv2=asText(wval(work,"s7","itv2"));
   let learned=[];
-  if(improve) learned.push(`처음 만든 결과를 보고 ${improve.replace(/\.$/,"")}는 점을 개선했습니다`);
-  if(itv1) learned.push(`이 포스터로 "${itv1.replace(/["']/g,"")}"라는 메시지를 전하고자 했습니다`);
-  if(itv2 && !improve) learned.push(`프롬프트를 다듬으며 ${itv2.replace(/\.$/,"")}는 변화를 경험했습니다`);
+  if(improve) learned.push(sentImprove(improve));
+  if(itv1) learned.push(`이 포스터로 "${stripEndPunct(itv1)}"라는 메시지를 전하고자 했습니다`);
+  if(itv2 && !improve) learned.push(sentChange(itv2));
   const learnedText = learned.map(endDot).join(" ");
   return { topic, title, message, promptProse, learnedText };
 }
