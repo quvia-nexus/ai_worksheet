@@ -9,6 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <!-- Firebase (compat SDK: 별도 빌드 없이 바로 사용) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -260,6 +261,9 @@ textarea.in:focus,input.in:focus{outline:none;border-color:var(--purple);backgro
 .sub-plan{font-size:12.5px;font-weight:800;color:#fff;background:linear-gradient(135deg,#f0a500,#e08800);
   border:none;border-radius:20px;padding:7px 14px;cursor:pointer;white-space:nowrap;flex:none;transition:.14s}
 .sub-plan:hover{transform:translateY(-1px);filter:brightness(1.06);box-shadow:0 4px 12px rgba(224,136,0,.35)}
+.dl-btn{margin-top:5px;font-size:12px;font-weight:700;color:var(--purple);background:#f2effc;
+  border:1px solid #ddd4f5;border-radius:14px;padding:4px 10px;cursor:pointer;width:100%;transition:.12s}
+.dl-btn:hover{background:var(--purple);color:#fff;border-color:var(--purple)}
 @media(max-width:640px){
   .sub-meta{display:none}
   .sub-open{font-size:12px}
@@ -1583,19 +1587,11 @@ function proposalHTML(ws, work, studentName){
   </div>`;
 }
 
-/* 기획서 PDF 생성 & 다운로드 */
-async function exportProposal(idx){
-  const s=(SUBS_VIEW||[])[idx]; if(!s){ toast("항목을 찾을 수 없어요"); return; }
-  const ws=WORKSHEETS[s.wsId];
-  if(!ws){ toast("활동지 정보를 찾을 수 없어요"); return; }
-  // 저장된 작품(work)이 있어야 기획서를 만들 수 있음
-  let work=s.work;
-  if(!work || !work.answers){ toast("이 학생의 저장된 활동지 내용이 없어요"); return; }
-  toast("기획서를 만드는 중…");
-  // 캡처용 임시 컨테이너를 화면 밖에 붙임
+/* 기획서 PDF를 jsPDF 문서로 생성 (다운로드/압축 공용) */
+async function buildProposalPDF(ws, work, studentName){
   const holder=document.createElement("div");
   holder.style.cssText="position:fixed;left:-9999px;top:0;";
-  holder.innerHTML=proposalHTML(ws, work, s.studentName);
+  holder.innerHTML=proposalHTML(ws, work, studentName);
   document.body.appendChild(holder);
   try{
     const node=holder.querySelector("#ppCapture");
@@ -1604,7 +1600,6 @@ async function exportProposal(idx){
     const pdf=new jsPDF("p","mm","a4");
     const pw=210, ph=297;
     const iw=pw, ih=canvas.height*(pw/canvas.width);
-    // 1장에 맞추되, 넘치면 세로로 잘라 다음 장에
     if(ih<=ph){
       pdf.addImage(canvas.toDataURL("image/jpeg",.95),"JPEG",0,0,iw,ih);
     }else{
@@ -1618,16 +1613,117 @@ async function exportProposal(idx){
         sY+=sliceH;
       }
     }
+    return pdf;
+  }finally{
+    document.body.removeChild(holder);
+  }
+}
+
+/* 기획서 PDF 생성 & 단일 다운로드 */
+async function exportProposal(idx){
+  const s=(SUBS_VIEW||[])[idx]; if(!s){ toast("항목을 찾을 수 없어요"); return; }
+  const ws=WORKSHEETS[s.wsId];
+  if(!ws){ toast("활동지 정보를 찾을 수 없어요"); return; }
+  let work=s.work;
+  if(!work || !work.answers){ toast("이 학생의 저장된 활동지 내용이 없어요"); return; }
+  toast("기획서를 만드는 중…");
+  try{
+    const pdf=await buildProposalPDF(ws, work, s.studentName);
     const fn=`${(s.studentName||'학생')}_${ws.theme}_기획서`.replace(/[\\/:*?"<>|\s]/g,"_")+".pdf";
     pdf.save(fn);
     toast("기획서를 저장했어요 ✓");
   }catch(e){
     console.error("기획서 생성 실패:",e); toast("기획서 생성에 실패했어요");
-  }finally{
-    document.body.removeChild(holder);
   }
 }
 window.exportProposal=exportProposal;
+
+/* ============================================================
+   전체 압축 다운로드
+   - zipAllImages():   학생 첨부 이미지·손글씨 사진을 zip으로
+   - zipAllProposals(): 모든 학생 기획서 PDF를 zip으로
+   현재 필터(SUBS_FILTER)가 적용된 목록만 대상으로 함
+   ============================================================ */
+
+/* 현재 화면에 보이는(필터 적용된) 항목 목록 */
+function currentSubList(){
+  let list=SUBS_CACHE||[];
+  if(SUBS_FILTER!=="all") list=list.filter(s=>s.wsId===SUBS_FILTER);
+  return list;
+}
+/* 파일명 중복 방지용 카운터 */
+function uniqueName(used, base, ext){
+  let name=`${base}.${ext}`, n=2;
+  while(used.has(name)){ name=`${base}_${n}.${ext}`; n++; }
+  used.add(name); return name;
+}
+
+async function zipAllImages(){
+  if(typeof JSZip==="undefined"){ toast("압축 기능을 불러오지 못했어요"); return; }
+  const list=currentSubList();
+  const zip=new JSZip(); const used=new Set(); let count=0;
+  toast("이미지를 모으는 중…");
+  for(const s of list){
+    const who=(s.studentName||'학생').replace(/[\\/:*?"<>|\s]/g,"_");
+    const work=s.work; if(!work) continue;
+    // 그림·영상 중 이미지(및 data URL 영상)
+    (work.media||[]).forEach((m,i)=>{
+      const data = m.data || (m.url && m.url.startsWith("data:") ? m.url : null);
+      if(!data || !data.startsWith("data:")) return;  // Storage URL 영상은 개별 저장 안내로 대체
+      const mt=(data.match(/^data:(.*?);/)||[])[1]||"";
+      const ext = mt.includes("png")?"png" : mt.includes("video")?"mp4" : "jpg";
+      const kind = m.type==="video" ? "영상" : "그림";
+      const base = `${who}_${kind}_${i+1}`;
+      try{ zip.file(uniqueName(used, base, ext), dataURLtoBlob(data)); count++; }catch(e){}
+    });
+    // 손글씨 활동지 사진
+    (work.papers||[]).forEach((p,i)=>{
+      if(!p.data || !p.data.startsWith("data:")) return;
+      const mt=(p.data.match(/^data:(.*?);/)||[])[1]||"";
+      const ext = mt.includes("png")?"png":"jpg";
+      const base=`${who}_손글씨활동지_${i+1}`;
+      try{ zip.file(uniqueName(used, base, ext), dataURLtoBlob(p.data)); count++; }catch(e){}
+    });
+  }
+  if(!count){ toast("압축할 이미지가 없어요"); return; }
+  toast(`이미지 ${count}개를 압축하는 중…`);
+  try{
+    const blob=await zip.generateAsync({type:"blob"});
+    const tag = SUBS_FILTER==="all" ? "전체" : (WORKSHEETS[SUBS_FILTER]?.theme || SUBS_FILTER);
+    triggerBlobDownload(blob, `큐비아_학생이미지_${tag}.zip`.replace(/\s/g,"_"));
+    toast(`이미지 ${count}개를 압축했어요 ✓`);
+  }catch(e){ console.error(e); toast("압축에 실패했어요"); }
+}
+window.zipAllImages=zipAllImages;
+
+async function zipAllProposals(){
+  if(typeof JSZip==="undefined"){ toast("압축 기능을 불러오지 못했어요"); return; }
+  const list=currentSubList().filter(s=>{
+    const ws=WORKSHEETS[s.wsId]; return ws && ws.kind==="poster" && s.work && s.work.answers;
+  });
+  if(!list.length){ toast("기획서를 만들 수 있는 활동지가 없어요"); return; }
+  const zip=new JSZip(); const used=new Set(); let count=0;
+  for(let i=0;i<list.length;i++){
+    const s=list[i]; const ws=WORKSHEETS[s.wsId];
+    toast(`기획서 만드는 중… (${i+1}/${list.length})`);
+    try{
+      const pdf=await buildProposalPDF(ws, s.work, s.studentName);
+      const who=(s.studentName||'학생').replace(/[\\/:*?"<>|\s]/g,"_");
+      const base=`${who}_${ws.theme}_기획서`.replace(/[\\/:*?"<>|\s]/g,"_");
+      zip.file(uniqueName(used, base, "pdf"), pdf.output("blob"));
+      count++;
+    }catch(e){ console.error("기획서 실패:", s.studentName, e); }
+  }
+  if(!count){ toast("기획서 생성에 실패했어요"); return; }
+  toast("기획서를 압축하는 중…");
+  try{
+    const blob=await zip.generateAsync({type:"blob"});
+    const tag = SUBS_FILTER==="all" ? "전체" : (WORKSHEETS[SUBS_FILTER]?.theme || SUBS_FILTER);
+    triggerBlobDownload(blob, `큐비아_기획서_${tag}.zip`.replace(/\s/g,"_"));
+    toast(`기획서 ${count}개를 압축했어요 ✓`);
+  }catch(e){ console.error(e); toast("압축에 실패했어요"); }
+}
+window.zipAllProposals=zipAllProposals;
 
 /* 기획서 미리보기 (모달) */
 function previewProposal(idx){
@@ -1874,6 +1970,8 @@ async function renderSubmissions(){
       <button class="tab on" data-f="all" onclick="subFilter('all')">📚 전체</button>
       ${Object.values(WORKSHEETS).map(ws=>`<button class="tab" data-f="${ws.id}" onclick="subFilter('${ws.id}')">${ws.emoji} ${esc(ws.grade)}</button>`).join("")}
       <div class="spacer" style="flex:1"></div>
+      <button class="btn ghost sm" onclick="zipAllImages()">🖼️ 이미지 압축</button>
+      <button class="btn ghost sm" onclick="zipAllProposals()">📄 기획서 압축</button>
       <button class="btn ghost sm" onclick="reloadSubs()">↻ 새로고침</button>
     </div>
     <div id="subBody"></div>
@@ -2023,27 +2121,36 @@ function openWorkPreview(s){
   const ws=WORKSHEETS[s.wsId];
   if(!ws){ toast("활동지 정보를 찾을 수 없어요"); return; }
   const work=s.work||{answers:{},media:[],papers:[]};
+  const who=(s.studentName||'학생').replace(/[\\/:*?"<>|\s]/g,"_");
   let html = answersSummary(ws, work);
-  // 이미지/영상 미디어 썸네일
+  // 이미지/영상 미디어 — 썸네일 + 원본 다운로드 버튼
   const media=Array.isArray(work.media)?work.media:[];
   if(media.length){
-    const thumbs=media.map(m=>{
+    const thumbs=media.map((m,i)=>{
       const src = m.type==="video" ? (m.url||m.data||"") : (m.data||"");
-      if(m.type==="video"){
-        return `<video src="${src}" controls playsinline style="width:160px;height:100px;object-fit:cover;border-radius:10px;margin:4px"></video>`;
-      }
-      return `<img src="${src}" style="width:120px;height:120px;object-fit:cover;border-radius:10px;margin:4px" alt="">`;
+      const view = m.type==="video"
+        ? `<video src="${src}" controls playsinline style="width:150px;height:100px;object-fit:cover;border-radius:10px;display:block"></video>`
+        : `<img src="${src}" style="width:130px;height:130px;object-fit:cover;border-radius:10px;display:block" alt="">`;
+      return `<div style="margin:4px;text-align:center">
+        ${view}
+        <button class="dl-btn" onclick="dlMedia('work','${esc(s.subId||'')}',${i},'${who}')">⬇️ 원본 저장</button>
+      </div>`;
     }).join("");
     html += `<div style="margin-top:14px"><b style="color:var(--gold)">첨부한 그림·영상</b><br>
       <div style="display:flex;flex-wrap:wrap;margin-top:6px">${thumbs}</div></div>`;
   }
-  // 손으로 쓴 활동지 사진
+  // 손으로 쓴 활동지 사진 — 썸네일 + 원본 다운로드
   const papers=Array.isArray(work.papers)?work.papers:[];
   if(papers.length){
-    const ps=papers.map(p=>`<img src="${p.data}" style="width:120px;height:150px;object-fit:cover;border-radius:10px;margin:4px" alt="">`).join("");
+    const ps=papers.map((p,i)=>`<div style="margin:4px;text-align:center">
+        <img src="${p.data}" style="width:120px;height:150px;object-fit:cover;border-radius:10px;display:block" alt="">
+        <button class="dl-btn" onclick="dlMedia('paper','${esc(s.subId||'')}',${i},'${who}')">⬇️ 원본 저장</button>
+      </div>`).join("");
     html += `<div style="margin-top:14px"><b style="color:var(--gold)">손으로 쓴 활동지</b><br>
       <div style="display:flex;flex-wrap:wrap;margin-top:6px">${ps}</div></div>`;
   }
+  // 이 미리보기의 work를 다운로드 함수가 참조할 수 있게 보관
+  PREVIEW_WORK[s.subId||''] = work;
   html += `<div style="margin-top:10px;padding-top:10px;border-top:1px solid #eee;color:var(--gray);font-size:13px">
     ${esc(s.studentName||'')}${s.birth?` · 생일 ${esc(s.birth)}`:''} · 마지막 저장 ${fmtDate(s.updatedAt)}
     <br><span style="color:#c99a00">※ 아직 PDF로 제출되지 않은 작성 중 활동지예요.</span></div>
@@ -2051,6 +2158,77 @@ function openWorkPreview(s){
   openModal(`${ws.emoji} ${ws.title} — ${ws.theme}`, html);
 }
 window.openWorkPreview=openWorkPreview;
+
+/* 미리보기 중인 work 보관소 (subId → work) */
+const PREVIEW_WORK={};
+
+/* 첨부 원본 다운로드
+   kind: 'work'(그림/영상) | 'paper'(손글씨 사진) */
+async function dlMedia(kind, subId, idx, who){
+  const work=PREVIEW_WORK[subId||''];
+  if(!work){ toast("파일 정보를 찾을 수 없어요"); return; }
+  const item = kind==="paper" ? (work.papers||[])[idx] : (work.media||[])[idx];
+  if(!item){ toast("파일을 찾을 수 없어요"); return; }
+
+  // 영상이면서 Storage URL만 있는 경우: 새 탭에서 열어 저장 유도 (CORS로 직접 다운로드 불가)
+  if(kind==="work" && item.type==="video" && item.url && !item.data){
+    // 우선 fetch로 시도해보고, 막히면 새 탭 열기로 폴백
+    try{
+      const resp=await fetch(item.url, {mode:"cors"});
+      if(!resp.ok) throw new Error("fetch 실패");
+      const blob=await resp.blob();
+      triggerBlobDownload(blob, safeName(who, item.name || `영상_${idx+1}.mp4`));
+      toast("영상을 저장했어요 ✓");
+    }catch(e){
+      window.open(item.url, "_blank", "noopener");
+      toast("새 탭에서 영상을 길게 눌러 저장하세요");
+    }
+    return;
+  }
+
+  // data URL(base64) → Blob → 다운로드
+  const dataUrl = kind==="paper" ? item.data : (item.data || item.url);
+  if(!dataUrl){ toast("원본 데이터가 없어요"); return; }
+  try{
+    if(dataUrl.startsWith("data:")){
+      const blob=dataURLtoBlob(dataUrl);
+      const ext = (dataUrl.match(/^data:image\/(\w+)/)||[])[1] ||
+                  (item.type==="video"?"mp4":"jpg");
+      const base = kind==="paper" ? `${who}_손글씨활동지_${idx+1}`
+                 : (item.type==="video" ? `${who}_영상_${idx+1}` : `${who}_그림_${idx+1}`);
+      triggerBlobDownload(blob, `${base}.${ext}`);
+      toast("원본을 저장했어요 ✓");
+    }else{
+      // 그 외 URL은 새 탭
+      window.open(dataUrl, "_blank", "noopener");
+    }
+  }catch(e){ console.error(e); toast("저장에 실패했어요"); }
+}
+window.dlMedia=dlMedia;
+
+/* data URL → Blob */
+function dataURLtoBlob(dataUrl){
+  const parts=dataUrl.split(",");
+  const mime=(parts[0].match(/:(.*?);/)||[])[1]||"application/octet-stream";
+  const bin=atob(parts[1]);
+  const arr=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+  return new Blob([arr],{type:mime});
+}
+/* Blob 다운로드 실행 */
+function triggerBlobDownload(blob, filename){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 4000);
+}
+/* 파일명 정리 */
+function safeName(who, name){
+  const clean=(name||"file").replace(/[\\/:*?"<>|\s]/g,"_");
+  return `${who}_${clean}`;
+}
 
 /* ---------------- boot ---------------- */
 (async function boot(){
