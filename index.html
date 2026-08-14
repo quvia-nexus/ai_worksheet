@@ -249,6 +249,9 @@ textarea.in:focus,input.in:focus{outline:none;border-color:var(--purple);backgro
 .sub-ic{font-size:26px;flex:none}
 .sub-main{display:flex;flex-direction:column;min-width:0;flex:1}
 .sub-name{font-weight:900;font-size:15px;color:var(--purple-dk)}
+.sub-badge{display:inline-block;font-size:11px;font-weight:800;padding:2px 9px;border-radius:20px;margin-left:6px;vertical-align:middle}
+.sub-badge.done{background:#e4f8f0;color:#12866a}
+.sub-badge.draft{background:#fff3d6;color:#b5820a}
 .sub-file{font-size:12px;color:var(--gray);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sub-meta{display:flex;flex-direction:column;align-items:flex-end;gap:2px;text-align:right;flex:none}
 .sub-ws{font-size:12.5px;color:var(--ink);font-weight:600}
@@ -618,6 +621,31 @@ const CLOUD = {
     if(!this.ready) return [];
     const snap=await this.db.collection("submissions").orderBy("updatedAt","desc").get();
     const out=[]; snap.forEach(d=>out.push(d.data())); return out;
+  },
+  // 학생들이 '저장'한 모든 활동지 작품을 훑어옴 (PDF 제출 여부와 무관)
+  //  students/{sk}/works/{wsId} 구조를 collectionGroup으로 한 번에 조회
+  async listAllWorks(){
+    if(!this.ready) return [];
+    const out=[];
+    try{
+      // 빠른 경로: collectionGroup("works")로 모든 학생의 works를 한 번에 가져옴
+      const snap=await this.db.collectionGroup("works").get();
+      snap.forEach(d=>{
+        const sk = d.ref.parent.parent ? d.ref.parent.parent.id : "";
+        out.push({ sk, wsId:d.id, work:d.data() });
+      });
+    }catch(e){
+      // collectionGroup 인덱스가 없거나 규칙에 막히면 폴백:
+      //  students 컬렉션을 순회하며 각 학생의 works를 개별 조회
+      console.warn("collectionGroup 실패, 폴백 사용:", e);
+      const studs=await this.db.collection("students").get();
+      for(const sd of studs.docs){
+        const sk=sd.id;
+        const ws=await this.db.collection("students").doc(sk).collection("works").get();
+        ws.forEach(d=>out.push({ sk, wsId:d.id, work:d.data() }));
+      }
+    }
+    return out;
   }
 };
 
@@ -1541,7 +1569,7 @@ async function renderSubmissions(){
     <div class="page-head">
       <div class="eyebrow">TEACHER · 학생 제출물</div>
       <h2>학생 제출물 모아보기 📥</h2>
-      <p>학생들이 작성한 활동지가 PDF로 자동 제출돼요. 파일명을 누르면 새 창에서 열립니다.</p>
+      <p>학생들이 저장한 활동지가 모두 보여요. <b>제출 완료</b>는 PDF로 열리고, <b>작성 중</b>은 저장된 내용을 바로 볼 수 있어요.</p>
     </div>
     <div class="tabs" id="subTabs">
       <button class="tab on" data-f="all" onclick="subFilter('all')">📚 전체</button>
@@ -1559,19 +1587,70 @@ async function renderSubmissions(){
   }
   $("#subBody").innerHTML=`<div class="empty"><div class="ic">⏳</div><p>제출물을 불러오는 중…</p></div>`;
   try{
-    SUBS_CACHE = await CLOUD.listSubmissions();
+    SUBS_CACHE = await loadAllSubmissions();
     paintSubs();
   }catch(e){
     console.error(e);
     $("#subBody").innerHTML=`<div class="empty"><div class="ic">⚠️</div><p>불러오지 못했어요. 새로고침을 눌러 주세요.</p></div>`;
   }
 }
+
+/* 학생 키(이름__생일8자리)에서 이름/생일 분리 */
+function parseSK(sk){
+  const i=(sk||"").indexOf("__");
+  if(i<0) return {name:sk||"", birth:""};
+  return {name:sk.slice(0,i), birth:sk.slice(i+2)};
+}
+
+/* PDF 제출물 + 저장된 작품을 하나의 목록으로 병합
+   - 같은 학생·활동지(subId)는 PDF 제출본을 우선으로 하고, 작품 내용(answers/media)을 붙임
+   - PDF 제출이 없어도 '저장된 작품'은 목록에 나타남 (작성 중 상태) */
+async function loadAllSubmissions(){
+  const [subs, works] = await Promise.all([
+    CLOUD.listSubmissions().catch(e=>{ console.error("제출본 로드 실패:",e); return []; }),
+    CLOUD.listAllWorks().catch(e=>{ console.error("작품 로드 실패:",e); return []; })
+  ]);
+  const map={};   // subId → row
+  // 1) 저장된 작품 먼저 채움 (기본 골격)
+  works.forEach(({sk, wsId, work})=>{
+    if(!work) return;
+    const subId=`${sk}__${wsId}`;
+    const p=parseSK(sk);
+    const ws=WORKSHEETS[wsId];
+    map[subId]={
+      sk, wsId, subId,
+      studentName:p.name, birth:p.birth,
+      wsTitle:ws?ws.title:wsId, wsTheme:ws?ws.theme:"",
+      updatedAt:work.updatedAt||0,
+      work,                    // 답변/미디어 원본 (내용 보기용)
+      hasWork:true, hasPDF:false
+    };
+  });
+  // 2) PDF 제출본 병합 (있으면 PDF 열기 가능 + 최신 시각 반영)
+  subs.forEach(s=>{
+    const subId=s.sk && s.wsId ? `${s.sk}__${s.wsId}` : (s.subId||`${s.studentName||''}__${s.wsId||''}`);
+    const prev=map[subId]||{};
+    map[subId]={
+      ...prev,
+      sk:s.sk||prev.sk, wsId:s.wsId||prev.wsId, subId,
+      studentName:s.studentName||prev.studentName||'',
+      birth:s.birth||prev.birth||'',
+      wsTitle:s.wsTitle||prev.wsTitle||'', wsTheme:s.wsTheme||prev.wsTheme||'',
+      fileName:s.fileName, url:s.url, dataUrl:s.dataUrl, store:s.store,
+      updatedAt:Math.max(prev.updatedAt||0, s.updatedAt||0),
+      work:prev.work||null,
+      hasWork:!!prev.hasWork, hasPDF:true
+    };
+  });
+  // 최신순 정렬
+  return Object.values(map).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+}
 function subFilter(f){ SUBS_FILTER=f; $$("#subTabs .tab").forEach(t=>t.classList.toggle("on",t.dataset.f===f)); paintSubs(); }
 window.subFilter=subFilter;
 async function reloadSubs(){
   if(!CLOUD.ready)return;
   $("#subBody").innerHTML=`<div class="empty"><div class="ic">⏳</div><p>새로고침 중…</p></div>`;
-  try{ SUBS_CACHE=await CLOUD.listSubmissions(); paintSubs(); }catch(e){ toast("새로고침 실패"); }
+  try{ SUBS_CACHE=await loadAllSubmissions(); paintSubs(); }catch(e){ toast("새로고침 실패"); }
 }
 window.reloadSubs=reloadSubs;
 
@@ -1586,17 +1665,23 @@ function paintSubs(){
   const rows=list.map((s,idx)=>{
     const ws=WORKSHEETS[s.wsId];
     const emoji=ws?ws.emoji:"📄";
+    const badge = s.hasPDF
+      ? `<span class="sub-badge done">제출 완료</span>`
+      : `<span class="sub-badge draft">작성 중</span>`;
+    const openLabel = s.hasPDF ? "PDF 열기 →" : "내용 보기 →";
+    const fileLine = s.hasPDF ? esc(s.fileName||'활동지.pdf')
+                              : (s.birth?`생일 ${esc(s.birth)}`:'저장된 활동지');
     return `<div class="sub-row" onclick="openSubmission(${idx})">
       <span class="sub-ic">${emoji}</span>
       <span class="sub-main">
-        <span class="sub-name">${esc(s.studentName||'이름없음')}</span>
-        <span class="sub-file">${esc(s.fileName||'활동지.pdf')}</span>
+        <span class="sub-name">${esc(s.studentName||'이름없음')} ${badge}</span>
+        <span class="sub-file">${fileLine}</span>
       </span>
       <span class="sub-meta">
         <span class="sub-ws">${esc(s.wsTitle||'')} · ${esc(s.wsTheme||'')}</span>
         <span class="sub-time">${fmtDate(s.updatedAt)}</span>
       </span>
-      <span class="sub-open">PDF 열기 →</span>
+      <span class="sub-open">${openLabel}</span>
     </div>`;
   }).join("");
   body.innerHTML=`<div class="sub-list">
@@ -1609,6 +1694,7 @@ function paintSubs(){
 /* 제출물 열기: Storage는 URL, 무료요금제는 Firestore dataUrl → 새 탭에서 PDF */
 function openSubmission(idx){
   const s = (SUBS_VIEW||[])[idx]; if(!s) return;
+  // PDF 제출본이 있으면 새 탭에서 열기
   if(s.url){ window.open(s.url, "_blank", "noopener"); return; }
   if(s.dataUrl){
     try{
@@ -1621,9 +1707,45 @@ function openSubmission(idx){
     }catch(e){ console.error(e); toast("PDF를 여는 데 실패했어요"); }
     return;
   }
-  toast("열 수 있는 PDF가 없어요");
+  // PDF가 없으면 저장된 작품 내용을 모달로 보여줌
+  if(s.work){ openWorkPreview(s); return; }
+  toast("열 수 있는 내용이 없어요");
 }
 window.openSubmission=openSubmission;
+
+/* 저장만 된 활동지(PDF 미제출)의 내용을 모달로 미리보기 */
+function openWorkPreview(s){
+  const ws=WORKSHEETS[s.wsId];
+  if(!ws){ toast("활동지 정보를 찾을 수 없어요"); return; }
+  const work=s.work||{answers:{},media:[],papers:[]};
+  let html = answersSummary(ws, work);
+  // 이미지/영상 미디어 썸네일
+  const media=Array.isArray(work.media)?work.media:[];
+  if(media.length){
+    const thumbs=media.map(m=>{
+      const src = m.type==="video" ? (m.url||m.data||"") : (m.data||"");
+      if(m.type==="video"){
+        return `<video src="${src}" controls playsinline style="width:160px;height:100px;object-fit:cover;border-radius:10px;margin:4px"></video>`;
+      }
+      return `<img src="${src}" style="width:120px;height:120px;object-fit:cover;border-radius:10px;margin:4px" alt="">`;
+    }).join("");
+    html += `<div style="margin-top:14px"><b style="color:var(--gold)">첨부한 그림·영상</b><br>
+      <div style="display:flex;flex-wrap:wrap;margin-top:6px">${thumbs}</div></div>`;
+  }
+  // 손으로 쓴 활동지 사진
+  const papers=Array.isArray(work.papers)?work.papers:[];
+  if(papers.length){
+    const ps=papers.map(p=>`<img src="${p.data}" style="width:120px;height:150px;object-fit:cover;border-radius:10px;margin:4px" alt="">`).join("");
+    html += `<div style="margin-top:14px"><b style="color:var(--gold)">손으로 쓴 활동지</b><br>
+      <div style="display:flex;flex-wrap:wrap;margin-top:6px">${ps}</div></div>`;
+  }
+  html += `<div style="margin-top:10px;padding-top:10px;border-top:1px solid #eee;color:var(--gray);font-size:13px">
+    ${esc(s.studentName||'')}${s.birth?` · 생일 ${esc(s.birth)}`:''} · 마지막 저장 ${fmtDate(s.updatedAt)}
+    <br><span style="color:#c99a00">※ 아직 PDF로 제출되지 않은 작성 중 활동지예요.</span></div>
+    <div style="margin-top:16px;text-align:right"><button class="btn" onclick="closeModal()">닫기</button></div>`;
+  openModal(`${ws.emoji} ${ws.title} — ${ws.theme}`, html);
+}
+window.openWorkPreview=openWorkPreview;
 
 /* ---------------- boot ---------------- */
 (async function boot(){
