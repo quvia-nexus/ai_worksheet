@@ -257,6 +257,9 @@ textarea.in:focus,input.in:focus{outline:none;border-color:var(--purple);backgro
 .sub-ws{font-size:12.5px;color:var(--ink);font-weight:600}
 .sub-time{font-size:11px;color:var(--gray)}
 .sub-open{font-size:13px;font-weight:800;color:var(--purple);white-space:nowrap;flex:none}
+.sub-plan{font-size:12.5px;font-weight:800;color:#fff;background:linear-gradient(135deg,#f0a500,#e08800);
+  border:none;border-radius:20px;padding:7px 14px;cursor:pointer;white-space:nowrap;flex:none;transition:.14s}
+.sub-plan:hover{transform:translateY(-1px);filter:brightness(1.06);box-shadow:0 4px 12px rgba(224,136,0,.35)}
 @media(max-width:640px){
   .sub-meta{display:none}
   .sub-open{font-size:12px}
@@ -1346,6 +1349,222 @@ function answersSummary(ws, work){
   }));
   return rows.join("")||"<i>아직 작성한 내용이 없어요.</i>";
 }
+
+/* ==========================================================
+   기획서(Proposal) 생성 — PDF 답변을 자연스러운 문장으로 다듬어
+   1장짜리 전시용 기획서 HTML을 만들고 PDF로 출력
+   ========================================================== */
+
+/* 임의 work 객체에서 값 꺼내기 (CUR에 의존하지 않음) */
+function wval(work, stId, fId){ return work && work.answers ? work.answers[stId+"."+fId] : undefined; }
+function asText(v){
+  if(v==null) return "";
+  if(Array.isArray(v)) return v.filter(Boolean).join(", ");
+  return String(v).trim();
+}
+/* 문장 끝에 마침표가 없으면 붙임 */
+function endDot(s){ s=(s||"").trim(); if(!s) return ""; return /[.!?。…]$/.test(s)?s:s+"."; }
+
+/* 프롬프트 4요소(matrix) → 자연스러운 한 문단으로 엮기 */
+function proseFromMatrix(m, fallbackPromptText){
+  if(!m || typeof m!=="object"){
+    return endDot(asText(fallbackPromptText));
+  }
+  const subj=asText(m[0]), bg=asText(m[1]);
+  let mood=asText(m[2]), style=asText(m[3]);
+  // 접두어 중복 방지: "전체적으로 …" 처럼 이미 부사로 시작하면 그대로, 아니면 뒤에서 감싸기
+  const sent=[];
+  if(subj) sent.push(`이 포스터는 ${subj}${josa(subj,"을","를")} 주인공으로 삼았습니다`);
+  if(bg)   sent.push(`배경에는 ${bg}${josa(bg,"을","를")} 배치했습니다`);
+  if(mood){
+    // "전체적으로 차가운 남색…" → "차가운 남색… 색감으로" 자연화
+    let mm=mood.replace(/^전체적으로\s*/,"").replace(/\s*(색감|분위기)$/,"");
+    sent.push(`${mm} 색감으로 분위기를 살렸습니다`);
+  }
+  if(style){
+    // "…사실적으로 표현한" 같은 서술형은 그대로, 명사형이면 "스타일로" 부착
+    let ss=style.replace(/\s*스타일$/,"").trim();
+    if(/(한|하는|된|표현한|그린|담은)$/.test(ss)){
+      sent.push(`${ss} 화풍으로 완성하고자 했습니다`);
+    }else{
+      sent.push(`${ss} 스타일로 표현하고자 했습니다`);
+    }
+  }
+  return sent.map(endDot).join(" ").trim();
+}
+
+/* 저학년(poster_low): who/where/what/style → 문단 */
+function proseFromLow(work){
+  const who=asText(wval(work,"s2","who")), where=asText(wval(work,"s2","where")),
+        what=asText(wval(work,"s2","what")), style=asText(wval(work,"s2","style"));
+  const sent=[];
+  if(who) sent.push(`이 그림의 주인공은 ${who}입니다`);
+  if(where) sent.push(`${where}${josa(where,"을","를")} 배경으로 삼았습니다`);
+  if(what) sent.push(`${what} 모습을 담았습니다`);
+  if(style) sent.push(`${style} 느낌으로 표현하고자 했습니다`);
+  return sent.map(endDot).join(" ").trim();
+}
+
+/* work → 기획서에 들어갈 항목 추출 */
+function extractProposal(ws, work){
+  const A=work.answers||{};
+  // 주제: poster_safe는 topic 체크, 그 외는 테마 사용
+  let topic = asText(wval(work,"s1","topic")) || ws.theme || "";
+  // 제목: 비었거나 오타로 의미없어 보이면 주제로 보정
+  let title = asText(wval(work,"s1","title"));
+  // 단독 자음/모음(ㄱ~ㅎ, ㅏ~ㅣ)이 섞여 있거나 의미글자 2자 미만이면 오타로 간주
+  const hasBrokenJamo = /[ㄱ-ㅎㅏ-ㅣ]/.test(title);
+  const meaningful = title.replace(/[^가-힣a-zA-Z0-9]/g,"").length;
+  if(!title || hasBrokenJamo || meaningful < 2){ title = topic || ws.theme; }
+  // 핵심 메시지
+  let message = asText(wval(work,"s1","message"));
+  // 저학년은 message 필드가 없으니 '상상하기(imagine)'를 메시지 대용으로
+  if(!message) message = asText(wval(work,"s1","imagine"));
+  // 프롬프트 문단
+  let promptProse="";
+  if(ws.id==="poster_low"){
+    promptProse = proseFromLow(work);
+  }else{
+    promptProse = proseFromMatrix(wval(work,"s3","matrix"));
+  }
+  // 배운 점: 개선내용(improve) + 인터뷰(itv1/itv2) 조합
+  const improve=asText(wval(work,"s6","improve"));
+  const itv1=asText(wval(work,"s7","itv1"))||asText(wval(work,"s5","best"));
+  const itv2=asText(wval(work,"s7","itv2"));
+  let learned=[];
+  if(improve) learned.push(`처음 만든 결과를 보고 ${improve.replace(/\.$/,"")}는 점을 개선했습니다`);
+  if(itv1) learned.push(`이 포스터로 "${itv1.replace(/["']/g,"")}"라는 메시지를 전하고자 했습니다`);
+  if(itv2 && !improve) learned.push(`프롬프트를 다듬으며 ${itv2.replace(/\.$/,"")}는 변화를 경험했습니다`);
+  const learnedText = learned.map(endDot).join(" ");
+  return { topic, title, message, promptProse, learnedText };
+}
+
+/* buildSummary를 임의 work로 실행 (CUR 비의존 버전) */
+function buildSummaryFrom(work, kind){
+  const a=(st,f)=>{ const v=wval(work,st,f); return v; };
+  if(kind==="posterLow"){
+    const who=a("s2","who")||"", where=a("s2","where")||"", what=a("s2","what")||"";
+    const style=joinChecks(a("s2","style"));
+    let parts=[];
+    if(where) parts.push(where+"에서");
+    if(who) parts.push(who+josa(who,"이","가"));
+    if(what) parts.push(what);
+    let line=parts.join(" ").trim();
+    if(style) line+=(line?", ":"")+style+" 그림으로";
+    if(line) line+=" 그려줘.";
+    return line;
+  }
+  if(kind==="posterHigh"){
+    const m=a("s3","matrix")||{};
+    let subj=(m[0]||"").trim(),bg=(m[1]||"").trim(),mood=(m[2]||"").trim(),style=(m[3]||"").trim();
+    if(bg&&bg===subj) bg="";
+    let parts=[];
+    if(bg) parts.push(bg+"에서");
+    if(subj) parts.push(subj+josa(subj,"이","가"));
+    if(mood) parts.push(mood+" 분위기의");
+    if(style) parts.push(style+" 스타일");
+    let line=parts.join(" ").trim();
+    if(line) line+=" 포스터를 만들어줘.";
+    return line;
+  }
+  return "";
+}
+
+/* 기획서 HTML (A4 1장, 캡처용) */
+function proposalHTML(ws, work, studentName){
+  const p=extractProposal(ws, work);
+  const row=(label, body)=> body ? `
+    <div class="pp-row">
+      <div class="pp-label">${label}</div>
+      <div class="pp-body">${esc(body)}</div>
+    </div>` : "";
+  return `<div id="ppCapture" style="width:794px;background:#fff;padding:0;font-family:'Noto Sans KR',sans-serif;color:#1a1340;">
+    <div style="background:linear-gradient(135deg,#4a2fa8,#7C6BF0);padding:34px 44px 26px;color:#fff;">
+      <div style="font-size:13px;letter-spacing:4px;opacity:.85;font-weight:700;">QUVIA-LAB · AI 포스터 기획서</div>
+      <div style="font-size:30px;font-weight:900;margin-top:10px;line-height:1.25;">${esc(p.title||ws.theme)}</div>
+      <div style="font-size:14px;margin-top:10px;opacity:.9;">${esc(ws.grade)} · ${esc(ws.theme)}${studentName?` · ${esc(studentName)}`:""}</div>
+    </div>
+    <div style="padding:32px 44px 40px;">
+      <style>
+        .pp-row{margin-bottom:22px;}
+        .pp-label{font-size:13px;font-weight:800;color:#7C6BF0;letter-spacing:1px;margin-bottom:7px;
+          border-left:4px solid #7C6BF0;padding-left:10px;}
+        .pp-body{font-size:15.5px;line-height:1.85;color:#2a2350;padding-left:14px;}
+      </style>
+      ${row("주제", p.topic)}
+      ${row("포스터 제목", p.title)}
+      ${row("전달하고 싶은 핵심 메시지", p.message)}
+      ${row("AI 프롬프트 기획", p.promptProse)}
+      ${row("제작 과정에서 배운 점", p.learnedText)}
+    </div>
+    <div style="padding:16px 44px;border-top:1px solid #eee;font-size:12px;color:#9990c0;text-align:center;">
+      Quvia-Lab · AI 미래인재 프로젝트 · quvia-lab.com
+    </div>
+  </div>`;
+}
+
+/* 기획서 PDF 생성 & 다운로드 */
+async function exportProposal(idx){
+  const s=(SUBS_VIEW||[])[idx]; if(!s){ toast("항목을 찾을 수 없어요"); return; }
+  const ws=WORKSHEETS[s.wsId];
+  if(!ws){ toast("활동지 정보를 찾을 수 없어요"); return; }
+  // 저장된 작품(work)이 있어야 기획서를 만들 수 있음
+  let work=s.work;
+  if(!work || !work.answers){ toast("이 학생의 저장된 활동지 내용이 없어요"); return; }
+  toast("기획서를 만드는 중…");
+  // 캡처용 임시 컨테이너를 화면 밖에 붙임
+  const holder=document.createElement("div");
+  holder.style.cssText="position:fixed;left:-9999px;top:0;";
+  holder.innerHTML=proposalHTML(ws, work, s.studentName);
+  document.body.appendChild(holder);
+  try{
+    const node=holder.querySelector("#ppCapture");
+    const canvas=await html2canvas(node,{scale:2, backgroundColor:"#ffffff", useCORS:true});
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF("p","mm","a4");
+    const pw=210, ph=297;
+    const iw=pw, ih=canvas.height*(pw/canvas.width);
+    // 1장에 맞추되, 넘치면 세로로 잘라 다음 장에
+    if(ih<=ph){
+      pdf.addImage(canvas.toDataURL("image/jpeg",.95),"JPEG",0,0,iw,ih);
+    }else{
+      const ratio=canvas.width/iw; const pageH=ph*ratio; let sY=0;
+      while(sY<canvas.height){
+        const sliceH=Math.min(pageH, canvas.height-sY);
+        const c2=document.createElement("canvas"); c2.width=canvas.width; c2.height=sliceH;
+        c2.getContext("2d").drawImage(canvas,0,sY,canvas.width,sliceH,0,0,canvas.width,sliceH);
+        if(sY>0) pdf.addPage();
+        pdf.addImage(c2.toDataURL("image/jpeg",.95),"JPEG",0,0,iw,sliceH/ratio);
+        sY+=sliceH;
+      }
+    }
+    const fn=`${(s.studentName||'학생')}_${ws.theme}_기획서`.replace(/[\\/:*?"<>|\s]/g,"_")+".pdf";
+    pdf.save(fn);
+    toast("기획서를 저장했어요 ✓");
+  }catch(e){
+    console.error("기획서 생성 실패:",e); toast("기획서 생성에 실패했어요");
+  }finally{
+    document.body.removeChild(holder);
+  }
+}
+window.exportProposal=exportProposal;
+
+/* 기획서 미리보기 (모달) */
+function previewProposal(idx){
+  const s=(SUBS_VIEW||[])[idx]; if(!s) return;
+  const ws=WORKSHEETS[s.wsId];
+  if(!ws || !s.work || !s.work.answers){ toast("저장된 활동지 내용이 없어요"); return; }
+  const inner=proposalHTML(ws, s.work, s.studentName);
+  openModal("📄 기획서 미리보기", `
+    <div style="text-align:right;margin-bottom:12px">
+      <button class="btn gold" onclick="exportProposal(${idx})">⬇️ 기획서 PDF 저장</button>
+      <button class="btn ghost" onclick="closeModal()">닫기</button>
+    </div>
+    <div style="max-height:64vh;overflow:auto;border:1px solid #eee;border-radius:12px;background:#f7f6fb;padding:14px">
+      <div style="width:794px;transform:scale(.58);transform-origin:top left;margin-bottom:-42%">${inner}</div>
+    </div>`);
+}
+window.previewProposal=previewProposal;
 function openMedia(i){
   const m=CUR.work.media[i]; const ws=CUR.ws; const lb=$("#lightbox");
   if(m.type==="video"){
@@ -1671,6 +1890,11 @@ function paintSubs(){
     const openLabel = s.hasPDF ? "PDF 열기 →" : "내용 보기 →";
     const fileLine = s.hasPDF ? esc(s.fileName||'활동지.pdf')
                               : (s.birth?`생일 ${esc(s.birth)}`:'저장된 활동지');
+    // 포스터 활동지이고 저장된 내용이 있으면 기획서 버튼 노출
+    const canProposal = s.hasWork && ws && ws.kind==="poster";
+    const proposalBtn = canProposal
+      ? `<button class="sub-plan" onclick="event.stopPropagation();previewProposal(${idx})">📄 기획서</button>`
+      : "";
     return `<div class="sub-row" onclick="openSubmission(${idx})">
       <span class="sub-ic">${emoji}</span>
       <span class="sub-main">
@@ -1681,6 +1905,7 @@ function paintSubs(){
         <span class="sub-ws">${esc(s.wsTitle||'')} · ${esc(s.wsTheme||'')}</span>
         <span class="sub-time">${fmtDate(s.updatedAt)}</span>
       </span>
+      ${proposalBtn}
       <span class="sub-open">${openLabel}</span>
     </div>`;
   }).join("");
